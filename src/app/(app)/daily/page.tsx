@@ -1,12 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { listForDay } from "@/lib/entries";
 import { today } from "@/lib/dates";
-import { EntryInput } from "@/components/EntryInput";
 import { EntryItem } from "@/components/EntryItem";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { DayHeader } from "@/components/DayHeader";
 import { TopThreeSection } from "@/components/TopThreeSection";
 import { ReflectionSection } from "@/components/ReflectionSection";
+import { BottomComposer } from "@/components/BottomComposer";
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -36,12 +36,6 @@ export default async function DailyPage({
   return (
     <div>
       <DayHeader date={date} />
-      <EntryInput
-        log_date={date}
-        defaultType="task"
-        types={["task", "event", "note", "mood"]}
-        placeholder="Brain dump… (tasks by default)"
-      />
 
       <TopThreeSection
         entries={topThree}
@@ -55,7 +49,7 @@ export default async function DailyPage({
         </h2>
         {otherTasks.length === 0 ? (
           <p className="mt-1 rounded-lg border border-dashed border-ink-200 bg-white px-3 py-4 text-center text-xs text-ink-400">
-            No other tasks yet. Brain-dump above.
+            No other tasks yet. Capture below.
           </p>
         ) : (
           <ul className="mt-1 rounded-lg border border-ink-100 bg-white px-2">
@@ -71,6 +65,10 @@ export default async function DailyPage({
       </section>
 
       <ReflectionSection entries={reflections} date={date} />
+
+      <div className="h-24" aria-hidden />
+
+      <BottomComposer date={date} />
 
       <BoardSwitcher
         variant="day"
