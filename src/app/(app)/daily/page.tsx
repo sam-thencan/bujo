@@ -58,7 +58,7 @@ export default async function DailyPage({
             No other tasks yet. Brain-dump above.
           </p>
         ) : (
-          <ul className="mt-1 overflow-hidden rounded-lg border border-ink-100 bg-white px-2">
+          <ul className="mt-1 rounded-lg border border-ink-100 bg-white px-2">
             {otherTasks.map((e) => (
               <EntryItem
                 key={e.id}

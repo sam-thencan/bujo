@@ -28,7 +28,7 @@ export function TopThreeSection({
       <h2 className="text-[11px] uppercase tracking-wide text-ink-400">
         Top 3 today
       </h2>
-      <ul className="mt-1 overflow-hidden rounded-lg border border-ink-100 bg-white">
+      <ul className="mt-1 rounded-lg border border-ink-100 bg-white">
         {slots.map((entry, i) => (
           <li
             key={i}

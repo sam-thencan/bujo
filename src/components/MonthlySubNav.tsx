@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/monthly", label: "Timeline" },
-  { href: "/monthly/plan", label: "Plan" },
   { href: "/monthly/habits", label: "Habits" },
+  { href: "/monthly/plan", label: "Plan" },
 ];
 
 export function MonthlySubNav({ month }: { month: string }) {

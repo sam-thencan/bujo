@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   cancelEntryAction,
   deleteEntryAction,
@@ -12,6 +12,10 @@ import {
 } from "@/app/(app)/actions";
 import type { Entry } from "@/lib/entries";
 import { shiftDate, shiftMonth, today, thisMonth } from "@/lib/dates";
+
+// Single-open menu coordination. When one entry's menu opens it dispatches
+// a CustomEvent; every other listener closes itself.
+const MENU_EVENT = "bujo:entry-menu-open";
 
 function symbolFor(e: Entry): string {
   if (e.type === "event") return "○";
@@ -41,6 +45,33 @@ export function EntryItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.content);
   const [isPending, startTransition] = useTransition();
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close on outside click or when another menu opens.
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onOtherOpen(e: Event) {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail !== entry.id) setMenuOpen(false);
+    }
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener(MENU_EVENT, onOtherOpen);
+    document.addEventListener("mousedown", onDocClick);
+    return () => {
+      document.removeEventListener(MENU_EVENT, onOtherOpen);
+      document.removeEventListener("mousedown", onDocClick);
+    };
+  }, [menuOpen, entry.id]);
+
+  function openMenu() {
+    setMenuOpen(true);
+    document.dispatchEvent(
+      new CustomEvent(MENU_EVENT, { detail: entry.id }),
+    );
+  }
 
   const isTask = entry.type === "task";
   const isDone = entry.status === "done";
@@ -138,43 +169,52 @@ export function EntryItem({
         )}
       </div>
 
-      <div className="relative">
+      <div className="relative" ref={menuRef}>
         <button
           type="button"
-          onClick={() => setMenuOpen((o) => !o)}
-          className="rounded px-2 py-0.5 text-sm text-ink-400 hover:text-ink-900"
+          onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
+          className="rounded px-2 py-0.5 text-base leading-none text-ink-500 hover:text-ink-900"
           aria-label="Actions"
         >
           ⋯
         </button>
         {menuOpen && (
-          <div
-            className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-md border border-ink-200 bg-white text-sm shadow-soft"
-            onMouseLeave={() => setMenuOpen(false)}
-          >
+          <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border border-ink-200 bg-white text-sm shadow-soft">
             {isTask && context.kind === "day" && (
-              <div className="flex border-b border-ink-100">
-                {[1, 2, 3].map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      run(() =>
-                        setPriorityRankAction(entry.id, rank === r ? null : r),
-                      );
-                    }}
-                    className={
-                      "flex-1 py-2 text-xs font-medium " +
-                      (rank === r
-                        ? "bg-ink-900 text-white"
-                        : "text-ink-700 hover:bg-ink-50")
-                    }
-                    title={`Set as top ${r}`}
-                  >
-                    Top {r}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2">
+                <span className="text-[11px] uppercase tracking-wide text-ink-400">
+                  Top 3
+                </span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3].map((r) => {
+                    const active = rank === r;
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          run(() =>
+                            setPriorityRankAction(
+                              entry.id,
+                              active ? null : r,
+                            ),
+                          );
+                        }}
+                        className={
+                          "inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs transition " +
+                          (active
+                            ? "bg-ink-900 text-white"
+                            : "border border-ink-200 text-ink-700 hover:border-ink-400")
+                        }
+                        title={active ? `Clear top ${r}` : `Set as top ${r}`}
+                        aria-pressed={active}
+                      >
+                        {r}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
             <MenuItem
