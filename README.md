@@ -1,6 +1,6 @@
 # bujo
 
-A calm, fast, mobile-first bullet journal web app. Built to be used daily in under a minute at a time.
+A calm, fast, mobile-first bullet journal web app. Built to be used daily in under a minute at a time. Deploy triggered.
 
 ## What it is
 
