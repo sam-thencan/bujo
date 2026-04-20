@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+  background: #f8f8f7;
+  color: #1f1f1c;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Respect iOS safe areas. */
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px));
+}
+.safe-top {
+  padding-top: calc(env(safe-area-inset-top, 0px));
+}
+
+/* Hide horizontal scrollbars in pill scrollers. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Subtle focus ring. */
+*:focus-visible {
+  outline: 2px solid #1f1f1c;
+  outline-offset: 2px;
+  border-radius: 6px;
+}

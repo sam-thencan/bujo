@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm audit *)",
+      "Bash(npm view *)",
+      "Bash(npx tsc *)",
+      "Bash(AUTH_SECRET=\"build-time-placeholder-of-sufficient-length-1234567890\" DATABASE_URL=\"file:./.build.db\" npm run build)",
+      "Bash(AUTH_SECRET=\"test-secret-that-is-definitely-long-enough-1234567890\" DATABASE_URL=\"file:./test.db\" PORT=3456 npm run start)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3456/login)",
+      "Bash(break)",
+      "Bash(curl -s -o /dev/null -w \"home=%{http_code} redirect=%{redirect_url}\\\\n\" -L --max-redirs 0 http://localhost:3456/)",
+      "Bash(curl -s -o /dev/null -w \"daily=%{http_code} redirect=%{redirect_url}\\\\n\" -L --max-redirs 0 http://localhost:3456/daily)",
+      "Bash(curl -s -o /dev/null -w \"monthly=%{http_code} redirect=%{redirect_url}\\\\n\" -L --max-redirs 0 http://localhost:3456/monthly)",
+      "Bash(curl -s -o /dev/null -w \"future=%{http_code} redirect=%{redirect_url}\\\\n\" -L --max-redirs 0 http://localhost:3456/future)",
+      "Bash(curl -s -o /dev/null -w \"settings=%{http_code} redirect=%{redirect_url}\\\\n\" -L --max-redirs 0 http://localhost:3456/settings)",
+      "Bash(DATABASE_URL=\"file:./smoke.db\" node scripts/smoke.mjs)",
+      "Bash(curl -s http://localhost:3456/login)",
+      "Bash(curl -s http://localhost:3456/signup)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"next start\")",
+      "Bash(npm run *)",
+      "Bash(node scripts/smoke.mjs)",
+      "Bash(PORT=3456 npm run dev)",
+      "Bash(curl -sS -o /dev/null -w \"HTTP %{http_code} in %{time_total}s\\\\n\" http://127.0.0.1:3456/login)",
+      "Bash(curl -sS -o /dev/null -w \"/signup %{http_code}\\\\n\" http://127.0.0.1:3456/signup)",
+      "Bash(curl -sS -o /dev/null -w \"/daily %{http_code}\\\\n\" http://127.0.0.1:3456/daily)",
+      "Bash(curl -sS -o /dev/null -w \"/monthly %{http_code}\\\\n\" http://127.0.0.1:3456/monthly)",
+      "Bash(curl -sS -o /dev/null -w \"/monthly/plan %{http_code}\\\\n\" http://127.0.0.1:3456/monthly/plan)",
+      "Bash(curl -sS -o /dev/null -w \"/monthly/habits %{http_code}\\\\n\" http://127.0.0.1:3456/monthly/habits)",
+      "Bash(git -C /Users/sam/Downloads/Projects/bujo status)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
