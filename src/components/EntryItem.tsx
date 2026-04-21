@@ -217,6 +217,46 @@ export function EntryItem({
                 </div>
               </div>
             )}
+            <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2">
+              <span className="text-[11px] uppercase tracking-wide text-ink-400">
+                Type
+              </span>
+              <div className="flex items-center gap-1">
+                {(
+                  [
+                    { key: "task", sym: "•" },
+                    { key: "event", sym: "○" },
+                    { key: "note", sym: "—" },
+                    { key: "mood", sym: "=" },
+                  ] as const
+                ).map(({ key, sym }) => {
+                  const active = entry.type === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        if (active) return;
+                        setMenuOpen(false);
+                        run(() =>
+                          editEntryAction({ id: entry.id, content: entry.content, type: key }),
+                        );
+                      }}
+                      className={
+                        "inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-sm transition " +
+                        (active
+                          ? "bg-ink-900 text-white"
+                          : "border border-ink-200 text-ink-700 hover:border-ink-400")
+                      }
+                      aria-pressed={active}
+                      title={key}
+                    >
+                      {sym}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <MenuItem
               label="Edit"
               onClick={() => {
