@@ -1,5 +1,3 @@
-import { HamburgerMenu } from "./HamburgerMenu";
-
 export function PageHeader({
   title,
   subtitle,
@@ -19,10 +17,9 @@ export function PageHeader({
           <p className="mt-0.5 text-xs text-ink-500">{subtitle}</p>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {action}
-        <HamburgerMenu />
-      </div>
+      {action && (
+        <div className="flex shrink-0 items-center gap-2">{action}</div>
+      )}
     </header>
   );
 }
