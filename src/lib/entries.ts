@@ -226,6 +226,31 @@ export async function deleteEntry(userId: string, id: string): Promise<void> {
   });
 }
 
+// Rewrite order_index for a list of entries in the given order. Positions
+// start at 1 and increase by 1. All ids are verified to belong to the user.
+export async function reorderEntries(
+  userId: string,
+  ids: string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  const db = await getDb();
+  const placeholders = ids.map(() => "?").join(",");
+  const owned = await db.execute({
+    sql: `SELECT id FROM entries WHERE user_id = ? AND id IN (${placeholders})`,
+    args: [userId, ...ids],
+  });
+  const valid = new Set(owned.rows.map((r: any) => String(r.id)));
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (!valid.has(id)) continue;
+    await db.execute({
+      sql: `UPDATE entries SET order_index = ?, updated_at = datetime('now')
+            WHERE id = ? AND user_id = ?`,
+      args: [i + 1, id, userId],
+    });
+  }
+}
+
 export async function toggleDone(userId: string, id: string): Promise<Entry> {
   const cur = await getEntry(userId, id);
   if (!cur) throw new Error("Not found");

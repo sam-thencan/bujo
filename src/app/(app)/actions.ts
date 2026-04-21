@@ -9,6 +9,7 @@ import {
   deleteEntry,
   listForDay,
   migrateEntry,
+  reorderEntries,
   setPriorityRank,
   toggleDone,
   updateEntry,
@@ -109,6 +110,16 @@ export async function deleteEntryAction(id: string) {
   const user = await requireUser();
   await deleteEntry(user.id, id);
   revalidateViews("all");
+}
+
+export async function reorderEntriesAction(input: {
+  ids: string[];
+  scope?: "daily" | "monthly" | "future";
+}) {
+  const user = await requireUser();
+  await reorderEntries(user.id, input.ids);
+  revalidateViews(input.scope ?? "daily");
+  return { ok: true };
 }
 
 export async function editEntryAction(input: {

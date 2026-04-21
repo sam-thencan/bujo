@@ -1,11 +1,11 @@
 import { requireUser } from "@/lib/auth";
 import { listForDay } from "@/lib/entries";
 import { today } from "@/lib/dates";
-import { EntryItem } from "@/components/EntryItem";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { DayHeader } from "@/components/DayHeader";
 import { TopThreeSection } from "@/components/TopThreeSection";
 import { BottomComposer } from "@/components/BottomComposer";
+import { SortableEntryList } from "@/components/SortableEntryList";
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -41,11 +41,7 @@ export default async function DailyPage({
             Nothing here yet — capture below.
           </p>
         ) : (
-          <ul className="rounded-lg border border-ink-100 bg-white px-2">
-            {rest.map((e) => (
-              <EntryItem key={e.id} entry={e} context={{ kind: "day", date }} />
-            ))}
-          </ul>
+          <SortableEntryList entries={rest} date={date} />
         )}
       </section>
 

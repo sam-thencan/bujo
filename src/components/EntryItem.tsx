@@ -33,6 +33,7 @@ export function EntryItem({
   entry,
   context,
   hideRank,
+  sortable,
 }: {
   entry: Entry;
   context:
@@ -40,6 +41,13 @@ export function EntryItem({
     | { kind: "month"; month: string }
     | { kind: "future"; month: string };
   hideRank?: boolean;
+  sortable?: {
+    setNodeRef?: (el: HTMLLIElement | null) => void;
+    style?: React.CSSProperties;
+    attributes?: Record<string, unknown>;
+    listeners?: Record<string, unknown>;
+    isDragging?: boolean;
+  };
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -118,7 +126,18 @@ export function EntryItem({
   }
 
   return (
-    <li className="group flex items-start gap-2 border-b border-ink-100 py-2">
+    <li
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
+      {...(sortable?.attributes ?? {})}
+      {...(sortable?.listeners ?? {})}
+      className={
+        "group flex touch-none items-start gap-2 border-b border-ink-100 py-2 last:border-b-0 " +
+        (sortable?.isDragging
+          ? "z-10 rounded-md bg-white shadow-soft ring-1 ring-ink-200"
+          : "")
+      }
+    >
       <div className="flex shrink-0 items-start">
         {!hideRank && rank ? (
           <span
