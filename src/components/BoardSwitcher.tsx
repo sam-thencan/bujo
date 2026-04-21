@@ -55,10 +55,10 @@ export function BoardSwitcher({
 
   return (
     <div className="fixed inset-x-0 bottom-[52px] z-20 border-t border-ink-100 bg-ink-50/95 backdrop-blur">
-      <div className="mx-auto flex max-w-screen-sm items-center gap-1 px-2 py-1.5">
+      <div className="mx-auto flex max-w-screen-sm items-center gap-1 px-2 py-2.5">
         <Link
           href={`${basePath}?${paramKey}=${prev}`}
-          className="rounded-md px-2 py-1 text-sm text-ink-500 hover:text-ink-900"
+          className="rounded-md px-2 py-1.5 text-base text-ink-500 hover:text-ink-900"
           aria-label="Previous"
         >
           ‹
@@ -75,7 +75,7 @@ export function BoardSwitcher({
                 href={`${basePath}?${paramKey}=${item}`}
                 data-active={active ? "true" : undefined}
                 className={
-                  "shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition " +
+                  "shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition " +
                   (active
                     ? "bg-ink-900 text-white"
                     : "bg-ink-100 text-ink-600 hover:bg-ink-200")
@@ -88,14 +88,14 @@ export function BoardSwitcher({
         </div>
         <Link
           href={`${basePath}?${paramKey}=${next}`}
-          className="rounded-md px-2 py-1 text-sm text-ink-500 hover:text-ink-900"
+          className="rounded-md px-2 py-1.5 text-base text-ink-500 hover:text-ink-900"
           aria-label="Next"
         >
           ›
         </Link>
         <Link
           href={todayHref}
-          className="ml-1 shrink-0 rounded-md px-2 py-1 text-[11px] text-ink-400 hover:text-ink-700"
+          className="ml-1 shrink-0 rounded-md px-2 py-1.5 text-[11px] text-ink-400 hover:text-ink-700"
           aria-label="Jump to today"
         >
           {variant === "day" ? "Today" : "This"}

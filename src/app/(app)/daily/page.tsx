@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { listForDay } from "@/lib/entries";
 import { shiftDate, today } from "@/lib/dates";
-import { DaySlider } from "@/components/DaySlider";
+import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { DayHeader } from "@/components/DayHeader";
 import { DailySubNav } from "@/components/DailySubNav";
 import { BottomComposer } from "@/components/BottomComposer";
@@ -71,9 +71,14 @@ export default async function DailyPage({
 
       <div className="h-24" aria-hidden />
 
-      <BottomComposer date={date} defaultTypes={["task", "event", "note"]} />
+      <BottomComposer date={date} defaultTypes={["task", "event"]} />
 
-      <DaySlider current={date} basePath="/daily" paramKey="date" />
+      <BoardSwitcher
+        variant="day"
+        current={date}
+        basePath="/daily"
+        paramKey="date"
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { listForDay } from "@/lib/entries";
 import { today } from "@/lib/dates";
-import { DaySlider } from "@/components/DaySlider";
+import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { DayHeader } from "@/components/DayHeader";
 import { DailySubNav } from "@/components/DailySubNav";
 import { BottomComposer } from "@/components/BottomComposer";
@@ -41,7 +41,12 @@ export default async function DailyReflectPage({
 
       <BottomComposer date={date} defaultTypes={["event", "note", "mood"]} />
 
-      <DaySlider current={date} basePath="/daily/reflect" paramKey="date" />
+      <BoardSwitcher
+        variant="day"
+        current={date}
+        basePath="/daily/reflect"
+        paramKey="date"
+      />
     </div>
   );
 }
