@@ -68,16 +68,40 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     });
     const row = res.rows[0];
     if (!row) return null;
+    let currentJournalId = row.current_journal_id
+      ? String(row.current_journal_id)
+      : null;
+    // Repair: if current_journal_id points to a journal the user no longer
+    // has access to (revoked / deleted), snap to any other membership they
+    // have. Costs one extra query on normal requests, 2–3 when repairing.
+    if (currentJournalId) {
+      const access = await db.execute({
+        sql: `SELECT 1 FROM memberships WHERE user_id = ? AND journal_id = ? LIMIT 1`,
+        args: [String(row.id), currentJournalId],
+      });
+      if (access.rows.length === 0) {
+        const fallback = await db.execute({
+          sql: `SELECT journal_id FROM memberships WHERE user_id = ?
+                ORDER BY created_at ASC LIMIT 1`,
+          args: [String(row.id)],
+        });
+        const fallbackId = fallback.rows[0]
+          ? String((fallback.rows[0] as any).journal_id)
+          : null;
+        await db.execute({
+          sql: "UPDATE users SET current_journal_id = ? WHERE id = ?",
+          args: [fallbackId, String(row.id)],
+        });
+        currentJournalId = fallbackId;
+      }
+    }
     return {
       id: String(row.id),
       email: String(row.email),
       name: row.name == null ? null : String(row.name),
       onboarded_at:
         row.onboarded_at == null ? null : String(row.onboarded_at),
-      current_journal_id:
-        row.current_journal_id == null
-          ? null
-          : String(row.current_journal_id),
+      current_journal_id: currentJournalId,
     };
   } catch {
     return null;

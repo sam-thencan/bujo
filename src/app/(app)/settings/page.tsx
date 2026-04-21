@@ -2,17 +2,36 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { listJournals } from "@/lib/journals";
+import { listMembers, type Member } from "@/lib/memberships";
+import { listIncomingRequests } from "@/lib/accessRequests";
 import { toggleLegendAction } from "@/app/(app)/actions";
 import { logoutAction } from "@/app/(auth)/actions";
 import { PageHeader } from "@/components/PageHeader";
 import { JournalsSettings } from "@/components/JournalsSettings";
+import { AccessRequestsInbox } from "@/components/AccessRequestsInbox";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [settings, journals] = await Promise.all([
+  const [settings, journals, incomingRequests] = await Promise.all([
     getSettings(user.id),
     listJournals(user.id),
+    listIncomingRequests(user.email),
   ]);
+  const ownedJournals = journals.filter((j) => j.role === "owner");
+  // Load members for each owned journal in parallel.
+  const memberEntries: Array<[string, Member[]]> = await Promise.all(
+    ownedJournals.map(async (j) => {
+      try {
+        return [j.id, await listMembers(user.id, j.id)] as [string, Member[]];
+      } catch {
+        return [j.id, [] as Member[]];
+      }
+    }),
+  );
+  const membersByJournal = Object.fromEntries(memberEntries) as Record<
+    string,
+    Member[]
+  >;
 
   return (
     <div className="pb-6">
@@ -22,12 +41,18 @@ export default async function SettingsPage() {
         {user.name && <Row label="Name" value={user.name} />}
       </section>
 
+      <AccessRequestsInbox
+        requests={incomingRequests}
+        ownedJournals={ownedJournals}
+      />
+
       <h2 className="mt-6 text-[11px] uppercase tracking-wide text-ink-400">
         Journals
       </h2>
       <JournalsSettings
         journals={journals}
         currentId={user.current_journal_id}
+        membersByJournal={membersByJournal}
       />
 
       <h2 className="mt-6 text-[11px] uppercase tracking-wide text-ink-400">

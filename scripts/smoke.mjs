@@ -41,6 +41,10 @@ await db.execute({
   args: [jid, uid],
 });
 await db.execute({
+  sql: "INSERT INTO memberships (id, journal_id, user_id, role) VALUES (?, ?, ?, 'owner')",
+  args: [id("m"), jid, uid],
+});
+await db.execute({
   sql: "UPDATE users SET current_journal_id = ? WHERE id = ?",
   args: [jid, uid],
 });
@@ -250,6 +254,10 @@ await db.execute({
   args: [jid2, uid],
 });
 await db.execute({
+  sql: "INSERT INTO memberships (id, journal_id, user_id, role) VALUES (?, ?, ?, 'owner')",
+  args: [id("m"), jid2, uid],
+});
+await db.execute({
   sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index)
         VALUES (?, ?, ?, 'task', 'Work-only task', 'open', ?, ?, 0)`,
   args: [id("e"), uid, jid2, today, month],
@@ -271,7 +279,73 @@ assert(
   "entries are isolated by journal_id (6 in journal 1, 1 in journal 2)",
 );
 
-// 14. cleanup
+// 14. owner membership was seeded with the journal; backfill is idempotent
+const ownerMembership = (
+  await db.execute({
+    sql: "SELECT COUNT(*) AS c FROM memberships WHERE journal_id = ? AND user_id = ? AND role = 'owner'",
+    args: [jid, uid],
+  })
+).rows[0];
+assert(
+  Number(ownerMembership.c) === 1,
+  "owner membership exists for the first journal",
+);
+
+// 15. second user — grant collaborator access, revoke, confirm cascade
+const uid2 = id("u");
+await db.execute({
+  sql: "INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, '', ?)",
+  args: [uid2, "friend@example.com", "Friend"],
+});
+await db.execute({ sql: "INSERT INTO settings (user_id) VALUES (?)", args: [uid2] });
+// Access request from friend targeting smoke@example.com
+const reqId = id("ar");
+await db.execute({
+  sql: `INSERT INTO access_requests (id, requester_user_id, target_email, status)
+        VALUES (?, ?, ?, 'pending')`,
+  args: [reqId, uid2, "smoke@example.com"],
+});
+// Owner approves: create a collaborator membership + mark resolved.
+await db.execute({
+  sql: "INSERT INTO memberships (id, journal_id, user_id, role) VALUES (?, ?, ?, 'collaborator')",
+  args: [id("m"), jid, uid2],
+});
+await db.execute({
+  sql: `UPDATE access_requests SET status = 'approved', approved_journal_id = ?,
+        resolved_at = datetime('now') WHERE id = ?`,
+  args: [jid, reqId],
+});
+// Friend's listJournals (via memberships) should now include jid.
+const friendJournals = (
+  await db.execute({
+    sql: `SELECT j.id FROM journals j
+          JOIN memberships m ON m.journal_id = j.id
+          WHERE m.user_id = ?`,
+    args: [uid2],
+  })
+).rows;
+assert(
+  friendJournals.length === 1 && String(friendJournals[0].id) === jid,
+  "approved collaborator sees the shared journal",
+);
+// Revoke.
+await db.execute({
+  sql: "DELETE FROM memberships WHERE journal_id = ? AND user_id = ? AND role != 'owner'",
+  args: [jid, uid2],
+});
+const friendAfter = (
+  await db.execute({
+    sql: "SELECT COUNT(*) AS c FROM memberships WHERE user_id = ?",
+    args: [uid2],
+  })
+).rows[0];
+assert(
+  Number(friendAfter.c) === 0,
+  "revoke removes the collaborator membership",
+);
+
+// 16. cleanup
+await db.execute({ sql: "DELETE FROM users WHERE id = ?", args: [uid2] });
 await db.execute({ sql: "DELETE FROM users WHERE id = ?", args: [uid] });
 const remaining = await db.execute({
   sql: "SELECT COUNT(*) AS c FROM entries WHERE user_id = ?",

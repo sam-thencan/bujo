@@ -19,15 +19,31 @@ CREATE TABLE IF NOT EXISTS journals (
 
 CREATE INDEX IF NOT EXISTS idx_journals_owner ON journals(owner_user_id);
 
+CREATE TABLE IF NOT EXISTS memberships (
+  id TEXT PRIMARY KEY,
+  journal_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'collaborator',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (journal_id, user_id),
+  FOREIGN KEY (journal_id) REFERENCES journals(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
+CREATE INDEX IF NOT EXISTS idx_memberships_journal ON memberships(journal_id);
+
 CREATE TABLE IF NOT EXISTS access_requests (
   id TEXT PRIMARY KEY,
   requester_user_id TEXT NOT NULL,
   target_email TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   message TEXT,
+  approved_journal_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   resolved_at TEXT,
-  FOREIGN KEY (requester_user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (requester_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (approved_journal_id) REFERENCES journals(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_access_requests_target

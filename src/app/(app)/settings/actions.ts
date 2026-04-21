@@ -9,6 +9,8 @@ import {
   renameJournal,
   switchJournal,
 } from "@/lib/journals";
+import { approveRequest, denyRequest } from "@/lib/accessRequests";
+import { revokeMember } from "@/lib/memberships";
 
 const journalIdSchema = z.string().min(1);
 const nameSchema = z.string().trim().min(1).max(80);
@@ -69,6 +71,45 @@ export async function deleteJournalAction(journalId: string) {
   if (!ok.success) return { error: "Invalid journal." };
   try {
     await deleteJournal(user.id, ok.data);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function approveRequestAction(input: {
+  requestId: string;
+  journalId: string;
+}) {
+  const user = await requireUser();
+  try {
+    await approveRequest(user.id, user.email, input.requestId, input.journalId);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function denyRequestAction(requestId: string) {
+  const user = await requireUser();
+  try {
+    await denyRequest(user.email, requestId);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function revokeMemberAction(input: {
+  journalId: string;
+  memberUserId: string;
+}) {
+  const user = await requireUser();
+  try {
+    await revokeMember(user.id, input.journalId, input.memberUserId);
   } catch (e) {
     return { error: (e as Error).message };
   }

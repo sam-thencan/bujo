@@ -69,6 +69,13 @@ async function migrate(c: Client) {
     "journal_id TEXT",
   );
   await backfillDefaultJournals(c);
+  await ensureColumn(
+    c,
+    "access_requests",
+    "approved_journal_id",
+    "approved_journal_id TEXT",
+  );
+  await backfillOwnerMemberships(c);
   // Indexes that reference journal_id — created here so they only run
   // after the columns definitely exist.
   for (const stmt of [
@@ -84,6 +91,23 @@ async function migrate(c: Client) {
     } catch (e) {
       console.warn("index creation skipped:", stmt, (e as Error).message);
     }
+  }
+}
+
+// For every journal, make sure the owner has an owner-role membership.
+// Idempotent via UNIQUE (journal_id, user_id) + INSERT OR IGNORE.
+async function backfillOwnerMemberships(c: Client) {
+  const journals = (
+    await c.execute("SELECT id, owner_user_id FROM journals")
+  ).rows;
+  for (const j of journals) {
+    const journalId = String((j as any).id);
+    const ownerId = String((j as any).owner_user_id);
+    await c.execute({
+      sql: `INSERT OR IGNORE INTO memberships (id, journal_id, user_id, role)
+            VALUES (?, ?, ?, 'owner')`,
+      args: [`m_${randomBytes(6).toString("hex")}`, journalId, ownerId],
+    });
   }
 }
 
