@@ -11,6 +11,7 @@ export default async function AppLayout({
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  if (!user.onboarded_at) redirect("/onboarding");
   const settings = await getSettings(user.id);
   return (
     <div className="min-h-dvh">

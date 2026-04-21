@@ -17,7 +17,12 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(s);
 }
 
-export type SessionUser = { id: string; email: string; name: string | null };
+export type SessionUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  onboarded_at: string | null;
+};
 
 export async function hashPassword(pw: string): Promise<string> {
   return bcrypt.hash(pw, 10);
@@ -55,7 +60,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     if (!userId) return null;
     const db = await getDb();
     const res = await db.execute({
-      sql: "SELECT id, email, name FROM users WHERE id = ? LIMIT 1",
+      sql: "SELECT id, email, name, onboarded_at FROM users WHERE id = ? LIMIT 1",
       args: [userId],
     });
     const row = res.rows[0];
@@ -64,6 +69,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       id: String(row.id),
       email: String(row.email),
       name: row.name == null ? null : String(row.name),
+      onboarded_at:
+        row.onboarded_at == null ? null : String(row.onboarded_at),
     };
   } catch {
     return null;
@@ -97,22 +104,99 @@ export async function signup(
     sql: "INSERT INTO settings (user_id) VALUES (?)",
     args: [id],
   });
-  return { id, email: email.toLowerCase(), name: name ?? null };
+  return {
+    id,
+    email: email.toLowerCase(),
+    name: name ?? null,
+    onboarded_at: null,
+  };
+}
+
+export async function findOrCreateGoogleUser(input: {
+  sub: string;
+  email: string;
+  name: string | null;
+}): Promise<SessionUser> {
+  const db = await getDb();
+  const email = input.email.toLowerCase();
+
+  // 1. Look up by google_sub first.
+  let row = (
+    await db.execute({
+      sql: "SELECT id, email, name, onboarded_at FROM users WHERE google_sub = ? LIMIT 1",
+      args: [input.sub],
+    })
+  ).rows[0];
+
+  // 2. Fall back to email match (e.g. prior password signup) and link the sub.
+  if (!row) {
+    const byEmail = (
+      await db.execute({
+        sql: "SELECT id, email, name, onboarded_at FROM users WHERE email = ? LIMIT 1",
+        args: [email],
+      })
+    ).rows[0];
+    if (byEmail) {
+      await db.execute({
+        sql: "UPDATE users SET google_sub = ? WHERE id = ?",
+        args: [input.sub, String(byEmail.id)],
+      });
+      row = byEmail;
+    }
+  }
+
+  // 3. Otherwise create a new user.
+  if (!row) {
+    if ((process.env.SIGNUPS ?? "open") !== "open") {
+      throw new Error("Sign-ups are currently disabled.");
+    }
+    const id = newId("u");
+    await db.execute({
+      sql: `INSERT INTO users (id, email, password_hash, google_sub, name)
+            VALUES (?, ?, '', ?, ?)`,
+      args: [id, email, input.sub, input.name],
+    });
+    await db.execute({
+      sql: "INSERT INTO settings (user_id) VALUES (?)",
+      args: [id],
+    });
+    row = { id, email, name: input.name, onboarded_at: null } as any;
+  }
+
+  return {
+    id: String(row!.id),
+    email: String(row!.email),
+    name: row!.name == null ? null : String(row!.name),
+    onboarded_at:
+      row!.onboarded_at == null ? null : String(row!.onboarded_at),
+  };
+}
+
+export async function markOnboarded(userId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute({
+    sql: "UPDATE users SET onboarded_at = datetime('now') WHERE id = ?",
+    args: [userId],
+  });
 }
 
 export async function login(email: string, password: string): Promise<SessionUser> {
   const db = await getDb();
   const res = await db.execute({
-    sql: "SELECT id, email, password_hash, name FROM users WHERE email = ? LIMIT 1",
+    sql: "SELECT id, email, password_hash, name, onboarded_at FROM users WHERE email = ? LIMIT 1",
     args: [email.toLowerCase()],
   });
   const row = res.rows[0];
-  if (!row) throw new Error("Invalid email or password.");
+  if (!row || !String(row.password_hash)) {
+    throw new Error("Invalid email or password.");
+  }
   const ok = await verifyPassword(password, String(row.password_hash));
   if (!ok) throw new Error("Invalid email or password.");
   return {
     id: String(row.id),
     email: String(row.email),
     name: row.name == null ? null : String(row.name),
+    onboarded_at:
+      row.onboarded_at == null ? null : String(row.onboarded_at),
   };
 }

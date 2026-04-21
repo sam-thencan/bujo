@@ -31,13 +31,15 @@ export async function loginAction(
     password: formData.get("password"),
   });
   if (!parsed.success) return { error: "Enter a valid email and password." };
+  let onboarded = false;
   try {
     const user = await login(parsed.data.email, parsed.data.password);
     await createSessionCookie(user.id);
+    onboarded = Boolean(user.onboarded_at);
   } catch (e) {
     return { error: (e as Error).message || "Login failed." };
   }
-  redirect("/daily");
+  redirect(onboarded ? "/daily" : "/onboarding");
 }
 
 export async function signupAction(
@@ -65,7 +67,7 @@ export async function signupAction(
   } catch (e) {
     return { error: (e as Error).message || "Sign up failed." };
   }
-  redirect("/daily");
+  redirect("/onboarding");
 }
 
 export async function logoutAction(): Promise<void> {

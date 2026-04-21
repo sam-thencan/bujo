@@ -2,9 +2,13 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { LoginForm } from "../(auth)/AuthForm";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string };
+}) {
   const user = await getSessionUser();
-  if (user) redirect("/daily");
+  if (user) redirect(user.onboarded_at ? "/daily" : "/onboarding");
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
       <div className="mb-8">
@@ -13,7 +17,7 @@ export default async function LoginPage() {
           A calm, fast bullet journal.
         </p>
       </div>
-      <LoginForm />
+      <LoginForm errorParam={searchParams.error ?? null} />
     </main>
   );
 }

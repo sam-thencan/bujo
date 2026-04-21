@@ -26,6 +26,21 @@ A practical operator guide. Written for a technical founder but usable by a comp
 | `DATABASE_AUTH_TOKEN` | prod only | Turso auth token |
 | `AUTH_SECRET` | yes | 32+ character random string used to sign JWT session cookies |
 | `SIGNUPS` | no | `open` (default) or `closed`. Set to `closed` after your team has signed up to disable public signups |
+| `GOOGLE_CLIENT_ID` | no | OAuth 2.0 Client ID from Google Cloud Console. Leave unset to disable Google sign-in |
+| `GOOGLE_CLIENT_SECRET` | no | OAuth 2.0 Client Secret from Google Cloud Console |
+
+### Setting up Google OAuth
+
+1. In Google Cloud Console → APIs & Services → Credentials → Create Credentials → OAuth client ID.
+2. Application type: **Web application**.
+3. Authorized redirect URIs — add each environment you'll sign in from:
+   - `http://localhost:3000/api/auth/google/callback`
+   - `https://your-vercel-domain.vercel.app/api/auth/google/callback`
+   - `https://your-custom-domain.com/api/auth/google/callback` (if you've added one)
+4. Copy the Client ID + Client Secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (Vercel env vars for prod, `.env.local` for dev).
+5. Redeploy. The **Continue with Google** button on `/login` and `/signup` will now work.
+
+If the env vars are missing, clicking the button will redirect to `/login?error=…`. Email + password sign-up still works in that case.
 
 Generate `AUTH_SECRET`:
 

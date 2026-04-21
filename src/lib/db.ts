@@ -42,6 +42,13 @@ async function migrate(c: Client) {
     "indent",
     "indent INTEGER NOT NULL DEFAULT 0",
   );
+  await ensureColumn(c, "users", "google_sub", "google_sub TEXT");
+  await ensureColumn(c, "users", "onboarded_at", "onboarded_at TEXT");
+  // Back-fill: existing users (who signed up before onboarding existed)
+  // skip the onboarding screen by treating them as already onboarded.
+  await c.execute(
+    "UPDATE users SET onboarded_at = created_at WHERE onboarded_at IS NULL",
+  );
 }
 
 export async function getDb(): Promise<Client> {
