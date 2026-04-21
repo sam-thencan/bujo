@@ -5,7 +5,6 @@ import { EntryItem } from "@/components/EntryItem";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { DayHeader } from "@/components/DayHeader";
 import { TopThreeSection } from "@/components/TopThreeSection";
-import { ReflectionSection } from "@/components/ReflectionSection";
 import { BottomComposer } from "@/components/BottomComposer";
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,51 +19,35 @@ export default async function DailyPage({
   const date = raw && dateRe.test(raw) ? raw : today();
   const entries = await listForDay(user.id, date);
 
-  const tasks = entries.filter((e) => e.type === "task");
-  const reflections = entries.filter((e) => e.type !== "task");
-
-  const topThree = tasks.filter(
-    (t) => t.priority_rank != null && t.status !== "migrated",
+  const topThree = entries.filter(
+    (e) => e.type === "task" && e.priority_rank != null && e.status !== "migrated",
   );
-  const otherTasks = tasks.filter(
-    (t) => t.priority_rank == null || t.status === "migrated",
+  const rest = entries.filter(
+    (e) => !(e.type === "task" && e.priority_rank != null && e.status !== "migrated"),
   );
-  const openOtherTasks = otherTasks.filter(
-    (t) => t.status === "open" || t.status === "scheduled",
+  const openTasks = rest.filter(
+    (e) => e.type === "task" && (e.status === "open" || e.status === "scheduled"),
   );
 
   return (
     <div>
       <DayHeader date={date} />
 
-      <TopThreeSection
-        entries={topThree}
-        candidates={openOtherTasks}
-        date={date}
-      />
+      <TopThreeSection entries={topThree} candidates={openTasks} date={date} />
 
-      <section className="mt-5">
-        <h2 className="text-[11px] uppercase tracking-wide text-ink-400">
-          Tasks
-        </h2>
-        {otherTasks.length === 0 ? (
-          <p className="mt-1 rounded-lg border border-dashed border-ink-200 bg-white px-3 py-4 text-center text-xs text-ink-400">
-            No other tasks yet. Capture below.
+      <section className="mt-4">
+        {rest.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-ink-200 px-3 py-5 text-center text-xs text-ink-400">
+            Nothing here yet — capture below.
           </p>
         ) : (
-          <ul className="mt-1 rounded-lg border border-ink-100 bg-white px-2">
-            {otherTasks.map((e) => (
-              <EntryItem
-                key={e.id}
-                entry={e}
-                context={{ kind: "day", date }}
-              />
+          <ul className="rounded-lg border border-ink-100 bg-white px-2">
+            {rest.map((e) => (
+              <EntryItem key={e.id} entry={e} context={{ kind: "day", date }} />
             ))}
           </ul>
         )}
       </section>
-
-      <ReflectionSection entries={reflections} date={date} />
 
       <div className="h-24" aria-hidden />
 

@@ -61,32 +61,32 @@ export async function createEntryAction(input: {
     log_date,
     log_month,
   });
-  revalidateViews();
+  revalidateViews(log_date ? "daily" : log_month ? "future" : "daily");
   return { ok: true };
 }
 
 export async function toggleDoneAction(id: string) {
   const user = await requireUser();
-  await toggleDone(user.id, id);
-  revalidateViews();
+  const entry = await toggleDone(user.id, id);
+  revalidateViews(entry.log_date ? "daily" : "monthly");
 }
 
 export async function setPriorityRankAction(id: string, rank: number | null) {
   const user = await requireUser();
   await setPriorityRank(user.id, id, rank);
-  revalidateViews();
+  revalidateViews("daily");
 }
 
 export async function cancelEntryAction(id: string) {
   const user = await requireUser();
   await updateEntry(user.id, id, { status: "cancelled" });
-  revalidateViews();
+  revalidateViews("daily");
 }
 
 export async function deleteEntryAction(id: string) {
   const user = await requireUser();
   await deleteEntry(user.id, id);
-  revalidateViews();
+  revalidateViews("all");
 }
 
 export async function editEntryAction(input: {
@@ -302,11 +302,12 @@ export async function deletePlanItemAction(id: string) {
 
 // ---------- Shared ----------
 
-function revalidateViews() {
-  revalidatePath("/daily");
-  revalidatePath("/monthly");
-  revalidatePath("/monthly/plan");
-  revalidatePath("/monthly/habits");
-  revalidatePath("/future");
-  revalidatePath("/settings");
+function revalidateViews(scope: "daily" | "monthly" | "future" | "all" = "all") {
+  if (scope === "daily" || scope === "all") revalidatePath("/daily");
+  if (scope === "monthly" || scope === "all") {
+    revalidatePath("/monthly");
+    revalidatePath("/monthly/plan");
+    revalidatePath("/monthly/habits");
+  }
+  if (scope === "future" || scope === "all") revalidatePath("/future");
 }
