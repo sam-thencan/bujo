@@ -3,7 +3,7 @@ import { prettyDateLong, shiftDate, today } from "@/lib/dates";
 import { format, parseISO } from "date-fns";
 import { HamburgerMenu } from "./HamburgerMenu";
 
-export function DayHeader({ date }: { date: string }) {
+export async function DayHeader({ date }: { date: string }) {
   const isToday = date === today();
   const isYesterday = date === shiftDate(today(), -1);
   const isTomorrow = date === shiftDate(today(), 1);
