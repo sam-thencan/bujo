@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { requireUser, type SessionUser } from "@/lib/auth";
 import {
   bulkMigrateOpen,
   createEntry,
@@ -40,6 +40,16 @@ const planCategorySchema = z.enum(["personal", "work"]);
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 
+async function requireJournal(): Promise<
+  SessionUser & { current_journal_id: string }
+> {
+  const user = await requireUser();
+  if (!user.current_journal_id) {
+    throw new Error("No active journal. Try signing out and back in.");
+  }
+  return user as SessionUser & { current_journal_id: string };
+}
+
 // ---------- Entries ----------
 
 export async function createEntryAction(input: {
@@ -48,7 +58,7 @@ export async function createEntryAction(input: {
   log_date?: string | null;
   log_month?: string;
 }) {
-  const user = await requireUser();
+  const user = await requireJournal();
   const raw = (input.raw ?? "").trim();
   if (!raw) return { error: "Empty entry." };
   const parsed = parseInput(raw, input.type ?? "task");
@@ -56,7 +66,7 @@ export async function createEntryAction(input: {
   const log_date = input.log_date ?? null;
   const log_month =
     input.log_month ?? (log_date ? monthOf(log_date) : undefined);
-  await createEntry(user.id, {
+  await createEntry(user.id, user.current_journal_id, {
     type: parsed.type,
     content: parsed.content,
     priority: parsed.priority,
@@ -129,7 +139,6 @@ export async function editEntryAction(input: {
     const t = typeSchema.safeParse(input.type);
     if (t.success) {
       patch.type = t.data;
-      // Non-task entries cannot hold a Top 3 rank.
       if (t.data !== "task") patch.priority_rank = null;
     }
   }
@@ -162,8 +171,8 @@ export async function bulkMigrateAction(input: {
   toDate?: string | null;
   toMonth?: string;
 }) {
-  const user = await requireUser();
-  const n = await bulkMigrateOpen(user.id, input);
+  const user = await requireJournal();
+  const n = await bulkMigrateOpen(user.id, user.current_journal_id, input);
   revalidateViews();
   return { ok: true, count: n };
 }
@@ -197,10 +206,15 @@ export async function saveDaySummaryAction(input: {
   date: string;
   summary: string;
 }) {
-  const user = await requireUser();
+  const user = await requireJournal();
   if (!dateSchema.safeParse(input.date).success)
     return { error: "Invalid date." };
-  await setDaySummary(user.id, input.date, input.summary);
+  await setDaySummary(
+    user.id,
+    user.current_journal_id,
+    input.date,
+    input.summary,
+  );
   revalidateViews();
   return { ok: true };
 }
@@ -212,11 +226,17 @@ export async function createHabitAction(input: {
   name: string;
   symbol?: string;
 }) {
-  const user = await requireUser();
+  const user = await requireJournal();
   if (!monthSchema.safeParse(input.month).success)
     return { error: "Invalid month." };
   try {
-    await createHabit(user.id, input.month, input.name, input.symbol);
+    await createHabit(
+      user.id,
+      user.current_journal_id,
+      input.month,
+      input.name,
+      input.symbol,
+    );
   } catch (e) {
     return { error: (e as Error).message };
   }
@@ -273,13 +293,18 @@ export async function carryForwardHabitsAction(input: {
   fromMonth: string;
   toMonth: string;
 }) {
-  const user = await requireUser();
+  const user = await requireJournal();
   if (
     !monthSchema.safeParse(input.fromMonth).success ||
     !monthSchema.safeParse(input.toMonth).success
   )
     return { error: "Invalid month." };
-  const n = await carryForwardHabits(user.id, input.fromMonth, input.toMonth);
+  const n = await carryForwardHabits(
+    user.id,
+    user.current_journal_id,
+    input.fromMonth,
+    input.toMonth,
+  );
   revalidateViews();
   return { ok: true, count: n };
 }
@@ -291,13 +316,19 @@ export async function createPlanItemAction(input: {
   category: PlanCategory;
   content: string;
 }) {
-  const user = await requireUser();
+  const user = await requireJournal();
   if (!monthSchema.safeParse(input.month).success)
     return { error: "Invalid month." };
   const cat = planCategorySchema.safeParse(input.category);
   if (!cat.success) return { error: "Invalid category." };
   try {
-    await createPlanItem(user.id, input.month, cat.data, input.content);
+    await createPlanItem(
+      user.id,
+      user.current_journal_id,
+      input.month,
+      cat.data,
+      input.content,
+    );
   } catch (e) {
     return { error: (e as Error).message };
   }

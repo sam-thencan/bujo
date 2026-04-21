@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
+import { listJournals } from "@/lib/journals";
 import { toggleLegendAction } from "@/app/(app)/actions";
 import { logoutAction } from "@/app/(auth)/actions";
 import { PageHeader } from "@/components/PageHeader";
+import { JournalsSettings } from "@/components/JournalsSettings";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const settings = await getSettings(user.id);
+  const [settings, journals] = await Promise.all([
+    getSettings(user.id),
+    listJournals(user.id),
+  ]);
 
   return (
     <div className="pb-6">
@@ -16,6 +21,14 @@ export default async function SettingsPage() {
         <Row label="Signed in as" value={user.email} />
         {user.name && <Row label="Name" value={user.name} />}
       </section>
+
+      <h2 className="mt-6 text-[11px] uppercase tracking-wide text-ink-400">
+        Journals
+      </h2>
+      <JournalsSettings
+        journals={journals}
+        currentId={user.current_journal_id}
+      />
 
       <h2 className="mt-6 text-[11px] uppercase tracking-wide text-ink-400">
         Display

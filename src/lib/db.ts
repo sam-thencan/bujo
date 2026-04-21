@@ -1,4 +1,5 @@
 import { createClient, type Client } from "@libsql/client";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -44,6 +45,51 @@ async function migrate(c: Client) {
   );
   await ensureColumn(c, "users", "google_sub", "google_sub TEXT");
   await ensureColumn(c, "users", "onboarded_at", "onboarded_at TEXT");
+  await ensureColumn(c, "users", "current_journal_id", "current_journal_id TEXT");
+  await ensureColumn(c, "entries", "journal_id", "journal_id TEXT");
+  await ensureColumn(c, "habits", "journal_id", "journal_id TEXT");
+  await ensureColumn(c, "day_summaries", "journal_id", "journal_id TEXT");
+  await ensureColumn(
+    c,
+    "action_plan_items",
+    "journal_id",
+    "journal_id TEXT",
+  );
+  await backfillDefaultJournals(c);
+}
+
+// For every user without a current_journal_id, create a default journal
+// and point their existing data at it. Idempotent.
+async function backfillDefaultJournals(c: Client) {
+  const rows = (
+    await c.execute(
+      "SELECT id FROM users WHERE current_journal_id IS NULL",
+    )
+  ).rows;
+  for (const r of rows) {
+    const userId = String((r as any).id);
+    const journalId = `j_${randomBytes(6).toString("hex")}`;
+    await c.execute({
+      sql: `INSERT INTO journals (id, owner_user_id, name) VALUES (?, ?, 'My journal')`,
+      args: [journalId, userId],
+    });
+    await c.execute({
+      sql: `UPDATE users SET current_journal_id = ? WHERE id = ?`,
+      args: [journalId, userId],
+    });
+    // Back-fill every data row owned by this user that lacks a journal.
+    for (const table of [
+      "entries",
+      "habits",
+      "day_summaries",
+      "action_plan_items",
+    ]) {
+      await c.execute({
+        sql: `UPDATE ${table} SET journal_id = ? WHERE user_id = ? AND journal_id IS NULL`,
+        args: [journalId, userId],
+      });
+    }
+  }
 }
 
 export async function getDb(): Promise<Client> {

@@ -28,14 +28,23 @@ function assert(cond, msg) {
   }
 }
 
-// 1. signup
+// 1. signup (with default journal)
 const uid = id("u");
+const jid = id("j");
 await db.execute({
   sql: "INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)",
   args: [uid, "smoke@example.com", await bcrypt.hash("correcthorse", 10), "Smoke"],
 });
 await db.execute({ sql: "INSERT INTO settings (user_id) VALUES (?)", args: [uid] });
-assert(true, "user created and settings row inserted");
+await db.execute({
+  sql: "INSERT INTO journals (id, owner_user_id, name) VALUES (?, ?, 'My journal')",
+  args: [jid, uid],
+});
+await db.execute({
+  sql: "UPDATE users SET current_journal_id = ? WHERE id = ?",
+  args: [jid, uid],
+});
+assert(true, "user created and settings/journal rows inserted");
 
 // 2. verify password
 const urow = (
@@ -53,9 +62,9 @@ for (const [type, content] of [
   ["note", "Great idea about X"],
 ]) {
   await db.execute({
-    sql: `INSERT INTO entries (id, user_id, type, content, status, log_date, log_month, order_index)
-          VALUES (?, ?, ?, ?, 'open', ?, ?, 0)`,
-    args: [id("e"), uid, type, content, today, month],
+    sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index)
+          VALUES (?, ?, ?, ?, ?, 'open', ?, ?, 0)`,
+    args: [id("e"), uid, jid, type, content, today, month],
   });
 }
 const dayRows = await db.execute({
@@ -83,16 +92,15 @@ assert(doneCheck.status === "done", "task toggled to done");
 const tmrwTask = id("e");
 const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 await db.execute({
-  sql: `INSERT INTO entries (id, user_id, type, content, status, log_date, log_month, order_index)
-        VALUES (?, ?, 'task', 'Follow up', 'open', ?, ?, 1)`,
-  args: [tmrwTask, uid, today, month],
+  sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index)
+        VALUES (?, ?, ?, 'task', 'Follow up', 'open', ?, ?, 1)`,
+  args: [tmrwTask, uid, jid, today, month],
 });
-// Migrate logic: create new entry on tomorrow, mark original migrated
 const newTomorrowId = id("e");
 await db.execute({
-  sql: `INSERT INTO entries (id, user_id, type, content, status, log_date, log_month, order_index, migrated_from_id)
-        VALUES (?, ?, 'task', 'Follow up', 'open', ?, ?, 0, ?)`,
-  args: [newTomorrowId, uid, tomorrow, tomorrow.slice(0, 7), tmrwTask],
+  sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index, migrated_from_id)
+        VALUES (?, ?, ?, 'task', 'Follow up', 'open', ?, ?, 0, ?)`,
+  args: [newTomorrowId, uid, jid, tomorrow, tomorrow.slice(0, 7), tmrwTask],
 });
 await db.execute({
   sql: "UPDATE entries SET status = 'migrated' WHERE id = ?",
@@ -112,9 +120,9 @@ assert(newOnTmrw.status === "open" && newOnTmrw.log_date === tomorrow, "new entr
 
 // 6. future log entry (no log_date)
 await db.execute({
-  sql: `INSERT INTO entries (id, user_id, type, content, status, log_date, log_month, order_index)
-        VALUES (?, ?, 'task', 'Book venue', 'scheduled', NULL, ?, 0)`,
-  args: [id("e"), uid, "2099-06"],
+  sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index)
+        VALUES (?, ?, ?, 'task', 'Book venue', 'scheduled', NULL, ?, 0)`,
+  args: [id("e"), uid, jid, "2099-06"],
 });
 const future = await db.execute({
   sql: "SELECT * FROM entries WHERE user_id = ? AND log_date IS NULL AND log_month = ?",
@@ -149,14 +157,14 @@ assert(
 const rankTaskA = id("e");
 const rankTaskB = id("e");
 await db.execute({
-  sql: `INSERT INTO entries (id, user_id, type, content, status, log_date, log_month, order_index, priority_rank)
-        VALUES (?, ?, 'task', 'Top A', 'open', ?, ?, 10, 1)`,
-  args: [rankTaskA, uid, today, month],
+  sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index, priority_rank)
+        VALUES (?, ?, ?, 'task', 'Top A', 'open', ?, ?, 10, 1)`,
+  args: [rankTaskA, uid, jid, today, month],
 });
 await db.execute({
-  sql: `INSERT INTO entries (id, user_id, type, content, status, log_date, log_month, order_index, priority_rank)
-        VALUES (?, ?, 'task', 'Top B', 'open', ?, ?, 11, 2)`,
-  args: [rankTaskB, uid, today, month],
+  sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index, priority_rank)
+        VALUES (?, ?, ?, 'task', 'Top B', 'open', ?, ?, 11, 2)`,
+  args: [rankTaskB, uid, jid, today, month],
 });
 // Promote B to rank 1; A should inherit B's old rank (2).
 await db.execute({
@@ -178,16 +186,16 @@ assert(
 
 // 10. day summaries (upsert semantics)
 await db.execute({
-  sql: `INSERT INTO day_summaries (user_id, date, summary) VALUES (?, ?, ?)
+  sql: `INSERT INTO day_summaries (user_id, journal_id, date, summary) VALUES (?, ?, ?, ?)
         ON CONFLICT(user_id, date) DO UPDATE SET summary = excluded.summary,
         updated_at = datetime('now')`,
-  args: [uid, today, "first"],
+  args: [uid, jid, today, "first"],
 });
 await db.execute({
-  sql: `INSERT INTO day_summaries (user_id, date, summary) VALUES (?, ?, ?)
+  sql: `INSERT INTO day_summaries (user_id, journal_id, date, summary) VALUES (?, ?, ?, ?)
         ON CONFLICT(user_id, date) DO UPDATE SET summary = excluded.summary,
         updated_at = datetime('now')`,
-  args: [uid, today, "second"],
+  args: [uid, jid, today, "second"],
 });
 const ds = (
   await db.execute({
@@ -200,9 +208,9 @@ assert(String(ds.summary) === "second", "day summary upserts cleanly");
 // 11. habits + logs
 const hId = id("h");
 await db.execute({
-  sql: `INSERT INTO habits (id, user_id, month, name, symbol, order_index)
-        VALUES (?, ?, ?, 'Meditate', 'M', 0)`,
-  args: [hId, uid, month],
+  sql: `INSERT INTO habits (id, user_id, journal_id, month, name, symbol, order_index)
+        VALUES (?, ?, ?, ?, 'Meditate', 'M', 0)`,
+  args: [hId, uid, jid, month],
 });
 await db.execute({
   sql: `INSERT INTO habit_logs (habit_id, date, done) VALUES (?, ?, 1)
@@ -220,9 +228,9 @@ assert(Number(hl.done) === 1, "habit log records done=1");
 // 12. action plan items
 const apId = id("ap");
 await db.execute({
-  sql: `INSERT INTO action_plan_items (id, user_id, month, category, content, done, order_index)
-        VALUES (?, ?, ?, 'personal', 'Plan garden', 0, 0)`,
-  args: [apId, uid, month],
+  sql: `INSERT INTO action_plan_items (id, user_id, journal_id, month, category, content, done, order_index)
+        VALUES (?, ?, ?, ?, 'personal', 'Plan garden', 0, 0)`,
+  args: [apId, uid, jid, month],
 });
 const ap = (
   await db.execute({
@@ -235,7 +243,35 @@ assert(
   "action plan item persists with category",
 );
 
-// 13. cleanup
+// 13. multi-journal isolation: a second journal's entries don't leak into the first
+const jid2 = id("j");
+await db.execute({
+  sql: "INSERT INTO journals (id, owner_user_id, name) VALUES (?, ?, 'Work')",
+  args: [jid2, uid],
+});
+await db.execute({
+  sql: `INSERT INTO entries (id, user_id, journal_id, type, content, status, log_date, log_month, order_index)
+        VALUES (?, ?, ?, 'task', 'Work-only task', 'open', ?, ?, 0)`,
+  args: [id("e"), uid, jid2, today, month],
+});
+const inJ1 = (
+  await db.execute({
+    sql: "SELECT COUNT(*) AS c FROM entries WHERE journal_id = ? AND log_date = ?",
+    args: [jid, today],
+  })
+).rows[0];
+const inJ2 = (
+  await db.execute({
+    sql: "SELECT COUNT(*) AS c FROM entries WHERE journal_id = ? AND log_date = ?",
+    args: [jid2, today],
+  })
+).rows[0];
+assert(
+  Number(inJ1.c) === 6 && Number(inJ2.c) === 1,
+  "entries are isolated by journal_id (6 in journal 1, 1 in journal 2)",
+);
+
+// 14. cleanup
 await db.execute({ sql: "DELETE FROM users WHERE id = ?", args: [uid] });
 const remaining = await db.execute({
   sql: "SELECT COUNT(*) AS c FROM entries WHERE user_id = ?",

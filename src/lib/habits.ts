@@ -24,27 +24,28 @@ function rowToHabit(row: any): Habit {
 }
 
 export async function listHabits(
-  userId: string,
+  journalId: string,
   month: string,
 ): Promise<Habit[]> {
   const db = await getDb();
   const res = await db.execute({
     sql: `SELECT * FROM habits
-          WHERE user_id = ? AND month = ? AND archived = 0
+          WHERE journal_id = ? AND month = ? AND archived = 0
           ORDER BY order_index ASC, created_at ASC`,
-    args: [userId, month],
+    args: [journalId, month],
   });
   return res.rows.map(rowToHabit);
 }
 
 export async function createHabit(
   userId: string,
+  journalId: string,
   month: string,
   name: string,
   symbol?: string,
 ): Promise<Habit> {
   const db = await getDb();
-  const existing = await listHabits(userId, month);
+  const existing = await listHabits(journalId, month);
   if (existing.length >= HABIT_LIMIT) {
     throw new Error(`At most ${HABIT_LIMIT} habits per month.`);
   }
@@ -55,9 +56,9 @@ export async function createHabit(
   const nextOrder =
     existing.reduce((m, h) => Math.max(m, h.order_index), 0) + 1;
   await db.execute({
-    sql: `INSERT INTO habits (id, user_id, month, name, symbol, order_index)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [id, userId, month, trimmed, sym, nextOrder],
+    sql: `INSERT INTO habits (id, user_id, journal_id, month, name, symbol, order_index)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, userId, journalId, month, trimmed, sym, nextOrder],
   });
   return {
     id,
@@ -102,19 +103,28 @@ export async function deleteHabit(userId: string, id: string): Promise<void> {
 
 export async function carryForwardHabits(
   userId: string,
+  journalId: string,
   fromMonth: string,
   toMonth: string,
 ): Promise<number> {
   const db = await getDb();
-  const src = await listHabits(userId, fromMonth);
-  const dst = await listHabits(userId, toMonth);
+  const src = await listHabits(journalId, fromMonth);
+  const dst = await listHabits(journalId, toMonth);
   if (dst.length > 0) return 0;
   let count = 0;
   for (const h of src) {
     await db.execute({
-      sql: `INSERT INTO habits (id, user_id, month, name, symbol, order_index)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [newId("h"), userId, toMonth, h.name, h.symbol, h.order_index],
+      sql: `INSERT INTO habits (id, user_id, journal_id, month, name, symbol, order_index)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        newId("h"),
+        userId,
+        journalId,
+        toMonth,
+        h.name,
+        h.symbol,
+        h.order_index,
+      ],
     });
     count++;
   }
@@ -122,7 +132,7 @@ export async function carryForwardHabits(
 }
 
 export async function getHabitLogs(
-  userId: string,
+  journalId: string,
   month: string,
 ): Promise<Map<string, Map<string, boolean>>> {
   const db = await getDb();
@@ -130,8 +140,8 @@ export async function getHabitLogs(
     sql: `SELECT hl.habit_id, hl.date, hl.done
           FROM habit_logs hl
           JOIN habits h ON h.id = hl.habit_id
-          WHERE h.user_id = ? AND h.month = ?`,
-    args: [userId, month],
+          WHERE h.journal_id = ? AND h.month = ?`,
+    args: [journalId, month],
   });
   const map = new Map<string, Map<string, boolean>>();
   for (const r of res.rows) {

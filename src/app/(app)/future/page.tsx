@@ -7,7 +7,10 @@ import { FutureStack } from "@/components/FutureStack";
 export default async function FuturePage() {
   const user = await requireUser();
   const months = futureMonths(12);
-  const lists = await Promise.all(months.map((m) => listFuture(user.id, m)));
+  const journalId = user.current_journal_id ?? "";
+  const lists = journalId
+    ? await Promise.all(months.map((m) => listFuture(journalId, m)))
+    : months.map(() => [] as Entry[]);
   const entriesByMonth = new Map<string, Entry[]>();
   months.forEach((m, i) => entriesByMonth.set(m, lists[i]));
 

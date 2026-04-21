@@ -22,6 +22,7 @@ export const ENTRY_STATUSES: EntryStatus[] = [
 export type Entry = {
   id: string;
   user_id: string;
+  journal_id: string | null;
   type: EntryType;
   content: string;
   status: EntryStatus;
@@ -40,6 +41,7 @@ function rowToEntry(row: Record<string, unknown>): Entry {
   return {
     id: String(row.id),
     user_id: String(row.user_id),
+    journal_id: row.journal_id == null ? null : String(row.journal_id),
     type: row.type as EntryType,
     content: String(row.content),
     status: row.status as EntryStatus,
@@ -57,44 +59,47 @@ function rowToEntry(row: Record<string, unknown>): Entry {
   };
 }
 
-export async function listForDay(userId: string, date: string): Promise<Entry[]> {
+export async function listForDay(
+  journalId: string,
+  date: string,
+): Promise<Entry[]> {
   const db = await getDb();
   const res = await db.execute({
     sql: `SELECT * FROM entries
-          WHERE user_id = ? AND log_date = ?
+          WHERE journal_id = ? AND log_date = ?
           ORDER BY order_index ASC, created_at ASC`,
-    args: [userId, date],
+    args: [journalId, date],
   });
   return res.rows.map(rowToEntry);
 }
 
 export async function listForMonth(
-  userId: string,
+  journalId: string,
   month: string,
   opts: { onlyMonthly?: boolean } = {},
 ): Promise<Entry[]> {
   const db = await getDb();
   const sql = opts.onlyMonthly
     ? `SELECT * FROM entries
-       WHERE user_id = ? AND log_month = ? AND log_date IS NULL
+       WHERE journal_id = ? AND log_month = ? AND log_date IS NULL
        ORDER BY order_index ASC, created_at ASC`
     : `SELECT * FROM entries
-       WHERE user_id = ? AND log_month = ?
+       WHERE journal_id = ? AND log_month = ?
        ORDER BY (log_date IS NULL) DESC, log_date ASC, order_index ASC, created_at ASC`;
-  const res = await db.execute({ sql, args: [userId, month] });
+  const res = await db.execute({ sql, args: [journalId, month] });
   return res.rows.map(rowToEntry);
 }
 
 export async function listFuture(
-  userId: string,
+  journalId: string,
   month: string,
 ): Promise<Entry[]> {
   const db = await getDb();
   const res = await db.execute({
     sql: `SELECT * FROM entries
-          WHERE user_id = ? AND log_month = ? AND log_date IS NULL
+          WHERE journal_id = ? AND log_month = ? AND log_date IS NULL
           ORDER BY order_index ASC, created_at ASC`,
-    args: [userId, month],
+    args: [journalId, month],
   });
   return res.rows.map(rowToEntry);
 }
@@ -114,6 +119,7 @@ export async function getEntry(
 
 export async function createEntry(
   userId: string,
+  journalId: string,
   input: {
     type: EntryType;
     content: string;
@@ -134,20 +140,21 @@ export async function createEntry(
 
   const maxOrder = await db.execute({
     sql: `SELECT COALESCE(MAX(order_index), 0) AS m FROM entries
-          WHERE user_id = ? AND
+          WHERE journal_id = ? AND
           (log_date IS ? OR log_date = ?) AND log_month = ?`,
-    args: [userId, log_date, log_date ?? "", log_month],
+    args: [journalId, log_date, log_date ?? "", log_month],
   });
   const nextOrder = Number((maxOrder.rows[0] as any).m ?? 0) + 1;
 
   await db.execute({
     sql: `INSERT INTO entries
-          (id, user_id, type, content, status, priority,
+          (id, user_id, journal_id, type, content, status, priority,
            log_date, log_month, order_index, migrated_from_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       id,
       userId,
+      journalId,
       input.type,
       input.content,
       status,
@@ -224,8 +231,6 @@ export async function deleteEntry(userId: string, id: string): Promise<void> {
   });
 }
 
-// Rewrite order_index for a list of entries in the given order. Positions
-// start at 1 and increase by 1. All ids are verified to belong to the user.
 export async function reorderEntries(
   userId: string,
   ids: string[],
@@ -271,8 +276,8 @@ export async function toggleDone(userId: string, id: string): Promise<Entry> {
   return updateEntry(userId, id, { status: nextStatus });
 }
 
-// Set a task's priority_rank (1..3). Pass null to clear. If another task in
-// the same day holds that rank, swap it with the old rank of this entry.
+// Set a task's priority_rank (1..3). Pass null to clear. Scoped to the
+// entry's own journal — rank swaps never cross journals.
 export async function setPriorityRank(
   userId: string,
   id: string,
@@ -286,13 +291,12 @@ export async function setPriorityRank(
   if (rank !== null && (rank < 1 || rank > 3)) throw new Error("Invalid rank");
   const oldRank = cur.priority_rank;
 
-  if (rank !== null) {
-    // Whoever currently holds `rank` gets this entry's old rank (possibly null).
+  if (rank !== null && cur.journal_id) {
     const other = await db.execute({
       sql: `SELECT id FROM entries
-            WHERE user_id = ? AND log_date = ?
+            WHERE journal_id = ? AND log_date = ?
             AND type = 'task' AND priority_rank = ? AND id != ?`,
-      args: [userId, cur.log_date, rank, id],
+      args: [cur.journal_id, cur.log_date, rank, id],
     });
     const otherId = other.rows[0] ? String((other.rows[0] as any).id) : null;
     if (otherId) {
@@ -317,11 +321,12 @@ export async function migrateEntry(
 ): Promise<Entry> {
   const cur = await getEntry(userId, id);
   if (!cur) throw new Error("Not found");
+  if (!cur.journal_id) throw new Error("Source entry has no journal.");
   const log_date = dest.log_date ?? null;
   const log_month =
     dest.log_month ?? (log_date ? monthOf(log_date) : thisMonth());
   const isFuture = !log_date;
-  const newEntry = await createEntry(userId, {
+  const newEntry = await createEntry(userId, cur.journal_id, {
     type: cur.type,
     content: cur.content,
     priority: cur.priority,
@@ -339,22 +344,28 @@ export async function migrateEntry(
 
 export async function bulkMigrateOpen(
   userId: string,
-  opts: { fromDate?: string; fromMonth?: string; toDate?: string | null; toMonth?: string },
+  journalId: string,
+  opts: {
+    fromDate?: string;
+    fromMonth?: string;
+    toDate?: string | null;
+    toMonth?: string;
+  },
 ): Promise<number> {
   const db = await getDb();
   let rows: any[] = [];
   if (opts.fromDate) {
     const res = await db.execute({
       sql: `SELECT * FROM entries
-            WHERE user_id = ? AND log_date = ? AND type = 'task' AND status = 'open'`,
-      args: [userId, opts.fromDate],
+            WHERE journal_id = ? AND log_date = ? AND type = 'task' AND status = 'open'`,
+      args: [journalId, opts.fromDate],
     });
     rows = res.rows;
   } else if (opts.fromMonth) {
     const res = await db.execute({
       sql: `SELECT * FROM entries
-            WHERE user_id = ? AND log_month = ? AND type = 'task' AND status = 'open'`,
-      args: [userId, opts.fromMonth],
+            WHERE journal_id = ? AND log_month = ? AND type = 'task' AND status = 'open'`,
+      args: [journalId, opts.fromMonth],
     });
     rows = res.rows;
   }
@@ -369,12 +380,19 @@ export async function bulkMigrateOpen(
   return count;
 }
 
+// Full export — everything the user owns across all their journals.
 export async function exportAll(userId: string): Promise<{
   user: { id: string; email: string; name: string | null };
+  journals: Array<{ id: string; name: string; created_at: string }>;
   entries: Entry[];
-  day_summaries: Array<{ date: string; summary: string }>;
+  day_summaries: Array<{
+    journal_id: string | null;
+    date: string;
+    summary: string;
+  }>;
   habits: Array<{
     id: string;
+    journal_id: string | null;
     month: string;
     name: string;
     symbol: string;
@@ -383,6 +401,7 @@ export async function exportAll(userId: string): Promise<{
   habit_logs: Array<{ habit_id: string; date: string; done: boolean }>;
   action_plan: Array<{
     id: string;
+    journal_id: string | null;
     month: string;
     category: string;
     content: string;
@@ -392,9 +411,13 @@ export async function exportAll(userId: string): Promise<{
   exported_at: string;
 }> {
   const db = await getDb();
-  const [u, e, s, ds, h, hl, ap] = await Promise.all([
+  const [u, j, e, s, ds, h, hl, ap] = await Promise.all([
     db.execute({
       sql: "SELECT id, email, name FROM users WHERE id = ? LIMIT 1",
+      args: [userId],
+    }),
+    db.execute({
+      sql: "SELECT id, name, created_at FROM journals WHERE owner_user_id = ? ORDER BY created_at",
       args: [userId],
     }),
     db.execute({
@@ -406,11 +429,11 @@ export async function exportAll(userId: string): Promise<{
       args: [userId],
     }),
     db.execute({
-      sql: "SELECT date, summary FROM day_summaries WHERE user_id = ? ORDER BY date",
+      sql: "SELECT journal_id, date, summary FROM day_summaries WHERE user_id = ? ORDER BY date",
       args: [userId],
     }),
     db.execute({
-      sql: "SELECT id, month, name, symbol, archived FROM habits WHERE user_id = ? ORDER BY month, order_index",
+      sql: "SELECT id, journal_id, month, name, symbol, archived FROM habits WHERE user_id = ? ORDER BY month, order_index",
       args: [userId],
     }),
     db.execute({
@@ -421,7 +444,7 @@ export async function exportAll(userId: string): Promise<{
       args: [userId],
     }),
     db.execute({
-      sql: "SELECT id, month, category, content, done FROM action_plan_items WHERE user_id = ? ORDER BY month, order_index",
+      sql: "SELECT id, journal_id, month, category, content, done FROM action_plan_items WHERE user_id = ? ORDER BY month, order_index",
       args: [userId],
     }),
   ]);
@@ -432,13 +455,20 @@ export async function exportAll(userId: string): Promise<{
       email: String(user.email),
       name: user.name == null ? null : String(user.name),
     },
+    journals: j.rows.map((r: any) => ({
+      id: String(r.id),
+      name: String(r.name),
+      created_at: String(r.created_at),
+    })),
     entries: e.rows.map((r) => rowToEntry(r as any)),
     day_summaries: ds.rows.map((r: any) => ({
+      journal_id: r.journal_id == null ? null : String(r.journal_id),
       date: String(r.date),
       summary: String(r.summary),
     })),
     habits: h.rows.map((r: any) => ({
       id: String(r.id),
+      journal_id: r.journal_id == null ? null : String(r.journal_id),
       month: String(r.month),
       name: String(r.name),
       symbol: String(r.symbol),
@@ -451,6 +481,7 @@ export async function exportAll(userId: string): Promise<{
     })),
     action_plan: ap.rows.map((r: any) => ({
       id: String(r.id),
+      journal_id: r.journal_id == null ? null : String(r.journal_id),
       month: String(r.month),
       category: String(r.category),
       content: String(r.content),

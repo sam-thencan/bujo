@@ -18,14 +18,15 @@ export default async function DailyPage({
   const user = await requireUser();
   const raw = searchParams.date;
   const date = raw && dateRe.test(raw) ? raw : today();
-  const entries = await listForDay(user.id, date);
+  const journalId = user.current_journal_id ?? "";
+  const entries = journalId ? await listForDay(journalId, date) : [];
 
   // Show the "migrate yesterday's open tasks" banner only when viewing today.
   let yesterdayOpenCount = 0;
   const isToday = date === today();
-  if (isToday) {
+  if (isToday && journalId) {
     const yday = shiftDate(date, -1);
-    const ydayEntries = await listForDay(user.id, yday);
+    const ydayEntries = await listForDay(journalId, yday);
     yesterdayOpenCount = ydayEntries.filter(
       (e) =>
         e.type === "task" &&

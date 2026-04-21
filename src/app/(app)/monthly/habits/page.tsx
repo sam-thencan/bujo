@@ -17,12 +17,15 @@ export default async function MonthlyHabitsPage({
   const raw = searchParams.month;
   const month = raw && monthRe.test(raw) ? raw : thisMonth();
   const prevMonth = shiftMonth(month, -1);
+  const journalId = user.current_journal_id ?? "";
 
-  const [habits, habitLogs, prevHabits] = await Promise.all([
-    listHabits(user.id, month),
-    getHabitLogs(user.id, month),
-    listHabits(user.id, prevMonth),
-  ]);
+  const [habits, habitLogs, prevHabits] = journalId
+    ? await Promise.all([
+        listHabits(journalId, month),
+        getHabitLogs(journalId, month),
+        listHabits(journalId, prevMonth),
+      ])
+    : [[], new Map<string, Map<string, boolean>>(), []];
   const days = daysInMonth(month);
 
   return (

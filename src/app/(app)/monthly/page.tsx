@@ -17,12 +17,15 @@ export default async function MonthlyTimelinePage({
   const user = await requireUser();
   const raw = searchParams.month;
   const month = raw && monthRe.test(raw) ? raw : thisMonth();
+  const journalId = user.current_journal_id ?? "";
 
-  const [summaries, habits, habitLogs] = await Promise.all([
-    getMonthSummaries(user.id, month),
-    listHabits(user.id, month),
-    getHabitLogs(user.id, month),
-  ]);
+  const [summaries, habits, habitLogs] = journalId
+    ? await Promise.all([
+        getMonthSummaries(journalId, month),
+        listHabits(journalId, month),
+        getHabitLogs(journalId, month),
+      ])
+    : [new Map<string, string>(), [], new Map<string, Map<string, boolean>>()];
   const days = daysInMonth(month);
 
   return (

@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { getDb } from "./db";
 import { newId } from "./ids";
+import { ensureDefaultJournal } from "./journals";
 
 const COOKIE = "bujo_session";
 const ALG = "HS256";
@@ -22,6 +23,7 @@ export type SessionUser = {
   email: string;
   name: string | null;
   onboarded_at: string | null;
+  current_journal_id: string | null;
 };
 
 export async function hashPassword(pw: string): Promise<string> {
@@ -60,7 +62,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     if (!userId) return null;
     const db = await getDb();
     const res = await db.execute({
-      sql: "SELECT id, email, name, onboarded_at FROM users WHERE id = ? LIMIT 1",
+      sql: `SELECT id, email, name, onboarded_at, current_journal_id
+            FROM users WHERE id = ? LIMIT 1`,
       args: [userId],
     });
     const row = res.rows[0];
@@ -71,6 +74,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       name: row.name == null ? null : String(row.name),
       onboarded_at:
         row.onboarded_at == null ? null : String(row.onboarded_at),
+      current_journal_id:
+        row.current_journal_id == null
+          ? null
+          : String(row.current_journal_id),
     };
   } catch {
     return null;
@@ -104,11 +111,13 @@ export async function signup(
     sql: "INSERT INTO settings (user_id) VALUES (?)",
     args: [id],
   });
+  const journal = await ensureDefaultJournal(id);
   return {
     id,
     email: email.toLowerCase(),
     name: name ?? null,
     onboarded_at: null,
+    current_journal_id: journal.id,
   };
 }
 
@@ -123,7 +132,8 @@ export async function findOrCreateGoogleUser(input: {
   // 1. Look up by google_sub first.
   let row = (
     await db.execute({
-      sql: "SELECT id, email, name, onboarded_at FROM users WHERE google_sub = ? LIMIT 1",
+      sql: `SELECT id, email, name, onboarded_at, current_journal_id
+            FROM users WHERE google_sub = ? LIMIT 1`,
       args: [input.sub],
     })
   ).rows[0];
@@ -132,7 +142,8 @@ export async function findOrCreateGoogleUser(input: {
   if (!row) {
     const byEmail = (
       await db.execute({
-        sql: "SELECT id, email, name, onboarded_at FROM users WHERE email = ? LIMIT 1",
+        sql: `SELECT id, email, name, onboarded_at, current_journal_id
+              FROM users WHERE email = ? LIMIT 1`,
         args: [email],
       })
     ).rows[0];
@@ -160,15 +171,26 @@ export async function findOrCreateGoogleUser(input: {
       sql: "INSERT INTO settings (user_id) VALUES (?)",
       args: [id],
     });
-    row = { id, email, name: input.name, onboarded_at: null } as any;
+    row = {
+      id,
+      email,
+      name: input.name,
+      onboarded_at: null,
+      current_journal_id: null,
+    } as any;
   }
 
+  // Make sure they have a journal + current_journal_id pointer.
+  const userId = String(row!.id);
+  const journal = await ensureDefaultJournal(userId);
+
   return {
-    id: String(row!.id),
+    id: userId,
     email: String(row!.email),
     name: row!.name == null ? null : String(row!.name),
     onboarded_at:
       row!.onboarded_at == null ? null : String(row!.onboarded_at),
+    current_journal_id: journal.id,
   };
 }
 
@@ -183,7 +205,8 @@ export async function markOnboarded(userId: string): Promise<void> {
 export async function login(email: string, password: string): Promise<SessionUser> {
   const db = await getDb();
   const res = await db.execute({
-    sql: "SELECT id, email, password_hash, name, onboarded_at FROM users WHERE email = ? LIMIT 1",
+    sql: `SELECT id, email, password_hash, name, onboarded_at, current_journal_id
+          FROM users WHERE email = ? LIMIT 1`,
     args: [email.toLowerCase()],
   });
   const row = res.rows[0];
@@ -192,11 +215,14 @@ export async function login(email: string, password: string): Promise<SessionUse
   }
   const ok = await verifyPassword(password, String(row.password_hash));
   if (!ok) throw new Error("Invalid email or password.");
+  const userId = String(row.id);
+  const journal = await ensureDefaultJournal(userId);
   return {
-    id: String(row.id),
+    id: userId,
     email: String(row.email),
     name: row.name == null ? null : String(row.name),
     onboarded_at:
       row.onboarded_at == null ? null : String(row.onboarded_at),
+    current_journal_id: journal.id,
   };
 }

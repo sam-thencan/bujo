@@ -17,7 +17,8 @@ export default async function DailyReflectPage({
   const user = await requireUser();
   const raw = searchParams.date;
   const date = raw && dateRe.test(raw) ? raw : today();
-  const entries = await listForDay(user.id, date);
+  const journalId = user.current_journal_id ?? "";
+  const entries = journalId ? await listForDay(journalId, date) : [];
   const reflections = entries.filter((e) => e.type !== "task");
 
   return (

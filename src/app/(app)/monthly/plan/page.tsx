@@ -16,7 +16,8 @@ export default async function MonthlyPlanPage({
   const user = await requireUser();
   const raw = searchParams.month;
   const month = raw && monthRe.test(raw) ? raw : thisMonth();
-  const items = await listPlan(user.id, month);
+  const journalId = user.current_journal_id ?? "";
+  const items = journalId ? await listPlan(journalId, month) : [];
 
   return (
     <div>
