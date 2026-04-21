@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   carryForwardHabitsAction,
   createHabitAction,
@@ -314,13 +314,21 @@ function HabitCell({
   symbol: string;
   done: boolean;
 }) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [pending, setPending] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setPending(null);
+  }, [done]);
+
+  const effectiveDone = pending ?? done;
 
   const timerRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
 
   function onPointerDown() {
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
+      setPending(false);
       startTransition(async () => {
         await resetHabitLogAction({ habitId, date });
       });
@@ -331,6 +339,7 @@ function HabitCell({
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+      setPending(!effectiveDone);
       startTransition(async () => {
         await toggleHabitLogAction({ habitId, date });
       });
@@ -347,21 +356,20 @@ function HabitCell({
   return (
     <button
       type="button"
-      disabled={isPending}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerLeave}
       onPointerLeave={onPointerLeave}
       className={
         "inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-md font-mono text-xs transition " +
-        (done
+        (effectiveDone
           ? "bg-ink-900 text-white"
           : "border border-ink-200 text-ink-300 hover:border-ink-400")
       }
-      aria-pressed={done}
+      aria-pressed={effectiveDone}
       title={`${symbol} — tap toggle, hold to reset`}
     >
-      {done ? symbol : ""}
+      {effectiveDone ? symbol : ""}
     </button>
   );
 }

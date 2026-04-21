@@ -13,19 +13,22 @@ const TYPES: Array<{ key: EntryType; sym: string; label: string }> = [
 
 export function BottomComposer({ date }: { date: string }) {
   const [raw, setRaw] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = raw.trim().length > 0 && !isPending;
+  const canSubmit = raw.trim().length > 0;
 
   function submit(type: EntryType) {
     const value = raw.trim();
     if (!value) return;
     setError(null);
+    setRaw("");
     startTransition(async () => {
       const res = await createEntryAction({ raw: value, type, log_date: date });
-      if (res?.error) setError(res.error);
-      else setRaw("");
+      if (res?.error) {
+        setError(res.error);
+        setRaw(value);
+      }
     });
   }
 
@@ -47,10 +50,7 @@ export function BottomComposer({ date }: { date: string }) {
                 submit("task");
               }
             }}
-            className={
-              "min-w-0 flex-1 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-base placeholder:text-ink-400 focus:border-ink-400 focus:bg-white focus:outline-none " +
-              (isPending ? "opacity-60" : "")
-            }
+            className="min-w-0 flex-1 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-base placeholder:text-ink-400 focus:border-ink-400 focus:bg-white focus:outline-none"
           />
           <div className="flex shrink-0 items-center gap-1">
             {TYPES.map((t) => (

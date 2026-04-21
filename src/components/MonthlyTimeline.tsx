@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   saveDaySummaryAction,
   toggleHabitLogAction,
@@ -126,26 +126,31 @@ function HabitDot({
   symbol: string;
   done: boolean;
 }) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [pending, setPending] = useState<boolean | null>(null);
+  useEffect(() => {
+    setPending(null);
+  }, [done]);
+  const effectiveDone = pending ?? done;
   return (
     <button
       type="button"
-      disabled={isPending}
-      onClick={() =>
+      onClick={() => {
+        setPending(!effectiveDone);
         startTransition(async () => {
           await toggleHabitLogAction({ habitId, date });
-        })
-      }
+        });
+      }}
       className={
         "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] transition " +
-        (done
+        (effectiveDone
           ? "bg-ink-900 text-white"
           : "border border-ink-200 text-ink-300 hover:border-ink-400")
       }
-      aria-pressed={done}
+      aria-pressed={effectiveDone}
       title={`${symbol} — tap to toggle`}
     >
-      {done ? symbol : ""}
+      {effectiveDone ? symbol : ""}
     </button>
   );
 }

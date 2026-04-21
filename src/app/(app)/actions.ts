@@ -7,6 +7,7 @@ import {
   bulkMigrateOpen,
   createEntry,
   deleteEntry,
+  listForDay,
   migrateEntry,
   setPriorityRank,
   toggleDone,
@@ -54,13 +55,34 @@ export async function createEntryAction(input: {
   const log_date = input.log_date ?? null;
   const log_month =
     input.log_month ?? (log_date ? monthOf(log_date) : undefined);
-  await createEntry(user.id, {
+  const created = await createEntry(user.id, {
     type: parsed.type,
     content: parsed.content,
     priority: parsed.priority,
     log_date,
     log_month,
   });
+
+  // Auto-rank: first 3 open tasks for a day get Top 1/2/3 automatically.
+  if (created.type === "task" && log_date) {
+    const dayEntries = await listForDay(user.id, log_date);
+    const taken = new Set(
+      dayEntries
+        .filter(
+          (e) =>
+            e.type === "task" &&
+            e.priority_rank != null &&
+            e.status !== "migrated" &&
+            e.id !== created.id,
+        )
+        .map((e) => e.priority_rank),
+    );
+    const nextRank = [1, 2, 3].find((r) => !taken.has(r));
+    if (nextRank !== undefined) {
+      await setPriorityRank(user.id, created.id, nextRank);
+    }
+  }
+
   revalidateViews(log_date ? "daily" : log_month ? "future" : "daily");
   return { ok: true };
 }
@@ -100,13 +122,18 @@ export async function editEntryAction(input: {
   const patch: {
     content: string;
     type?: EntryType;
+    priority_rank?: number | null;
   } = { content };
   if (input.type) {
     const t = typeSchema.safeParse(input.type);
-    if (t.success) patch.type = t.data;
+    if (t.success) {
+      patch.type = t.data;
+      // Non-task entries cannot hold a Top 3 rank.
+      if (t.data !== "task") patch.priority_rank = null;
+    }
   }
   await updateEntry(user.id, input.id, patch);
-  revalidateViews();
+  revalidateViews("daily");
   return { ok: true };
 }
 

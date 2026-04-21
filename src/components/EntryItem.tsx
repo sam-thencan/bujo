@@ -10,7 +10,7 @@ import {
   setPriorityRankAction,
   toggleDoneAction,
 } from "@/app/(app)/actions";
-import type { Entry } from "@/lib/entries";
+import type { Entry, EntryStatus } from "@/lib/entries";
 import { shiftDate, shiftMonth, today, thisMonth } from "@/lib/dates";
 
 // Single-open menu coordination. When one entry's menu opens it dispatches
@@ -47,6 +47,20 @@ export function EntryItem({
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  // Optimistic state — applied instantly, reverted when server revalidates.
+  const [pendingStatus, setPendingStatus] = useState<EntryStatus | null>(null);
+  const [pendingRank, setPendingRank] = useState<number | null | undefined>(
+    undefined,
+  );
+  const [optimisticallyDeleted, setOptimisticallyDeleted] = useState(false);
+
+  useEffect(() => {
+    setPendingStatus(null);
+  }, [entry.status]);
+  useEffect(() => {
+    setPendingRank(undefined);
+  }, [entry.priority_rank]);
+
   // Close on outside click or when another menu opens.
   useEffect(() => {
     if (!menuOpen) return;
@@ -73,11 +87,16 @@ export function EntryItem({
     );
   }
 
+  const effectiveStatus = pendingStatus ?? entry.status;
+  const effectiveRank =
+    pendingRank === undefined ? entry.priority_rank : pendingRank;
   const isTask = entry.type === "task";
-  const isDone = entry.status === "done";
-  const isCancelled = entry.status === "cancelled";
-  const isMigrated = entry.status === "migrated";
-  const rank = entry.priority_rank;
+  const isDone = effectiveStatus === "done";
+  const isCancelled = effectiveStatus === "cancelled";
+  const isMigrated = effectiveStatus === "migrated";
+  const rank = effectiveRank;
+
+  if (optimisticallyDeleted) return null;
 
   function run(fn: () => Promise<unknown>) {
     startTransition(async () => {
@@ -111,8 +130,12 @@ export function EntryItem({
         ) : null}
         <button
           type="button"
-          disabled={!isTask || isPending}
-          onClick={() => run(() => toggleDoneAction(entry.id))}
+          disabled={!isTask}
+          onClick={() => {
+            if (!isTask) return;
+            setPendingStatus(isDone ? "open" : "done");
+            run(() => toggleDoneAction(entry.id));
+          }}
           className={
             "mt-0.5 w-5 text-center font-mono text-base leading-6 " +
             (isTask ? "cursor-pointer text-ink-900" : "text-ink-400")
@@ -122,7 +145,7 @@ export function EntryItem({
             isTask ? (isDone ? "Mark open" : "Mark done") : "Signifier"
           }
         >
-          {symbolFor(entry)}
+          {symbolFor({ ...entry, status: effectiveStatus })}
         </button>
       </div>
 
@@ -194,12 +217,9 @@ export function EntryItem({
                         type="button"
                         onClick={() => {
                           setMenuOpen(false);
-                          run(() =>
-                            setPriorityRankAction(
-                              entry.id,
-                              active ? null : r,
-                            ),
-                          );
+                          const next = active ? null : r;
+                          setPendingRank(next);
+                          run(() => setPriorityRankAction(entry.id, next));
                         }}
                         className={
                           "inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs transition " +
@@ -270,6 +290,7 @@ export function EntryItem({
                   label="Migrate → tomorrow"
                   onClick={() => {
                     setMenuOpen(false);
+                    setPendingStatus("migrated");
                     run(() =>
                       migrateEntryAction({
                         id: entry.id,
@@ -282,6 +303,7 @@ export function EntryItem({
                   label="Schedule → next month"
                   onClick={() => {
                     setMenuOpen(false);
+                    setPendingStatus("scheduled");
                     run(() =>
                       migrateEntryAction({
                         id: entry.id,
@@ -327,6 +349,7 @@ export function EntryItem({
                 label="Cancel"
                 onClick={() => {
                   setMenuOpen(false);
+                  setPendingStatus("cancelled");
                   run(() => cancelEntryAction(entry.id));
                 }}
               />
@@ -336,6 +359,7 @@ export function EntryItem({
               danger
               onClick={() => {
                 setMenuOpen(false);
+                setOptimisticallyDeleted(true);
                 run(() => deleteEntryAction(entry.id));
               }}
             />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   createPlanItemAction,
   deletePlanItemAction,
@@ -55,10 +55,13 @@ function PlanColumn({
     const v = draft.trim();
     if (!v) return;
     setError(null);
+    setDraft("");
     startTransition(async () => {
       const res = await createPlanItemAction({ month, category, content: v });
-      if (res?.error) setError(res.error);
-      else setDraft("");
+      if (res?.error) {
+        setError(res.error);
+        setDraft(v);
+      }
     });
   }
 
@@ -112,7 +115,15 @@ function PlanColumn({
 function PlanRow({ item }: { item: PlanItem }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.content);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [pendingDone, setPendingDone] = useState<boolean | null>(null);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    setPendingDone(null);
+  }, [item.done]);
+  const effectiveDone = pendingDone ?? item.done;
+
+  if (hidden) return null;
 
   function commit() {
     const v = draft.trim();
@@ -131,16 +142,16 @@ function PlanRow({ item }: { item: PlanItem }) {
     <li className="flex items-start gap-2 border-b border-ink-100 px-3 py-2 last:border-b-0">
       <button
         type="button"
-        onClick={() =>
+        onClick={() => {
+          setPendingDone(!effectiveDone);
           startTransition(async () => {
             await togglePlanItemAction(item.id);
-          })
-        }
-        disabled={isPending}
+          });
+        }}
         className="mt-0.5 w-5 shrink-0 text-center font-mono text-base leading-5 text-ink-900"
-        aria-label={item.done ? "Mark open" : "Mark done"}
+        aria-label={effectiveDone ? "Mark open" : "Mark done"}
       >
-        {item.done ? "X" : "•"}
+        {effectiveDone ? "X" : "•"}
       </button>
       {editing ? (
         <input
@@ -169,7 +180,7 @@ function PlanRow({ item }: { item: PlanItem }) {
           <span
             className={
               "text-sm leading-5 " +
-              (item.done ? "text-ink-400 line-through" : "text-ink-800")
+              (effectiveDone ? "text-ink-400 line-through" : "text-ink-800")
             }
           >
             {item.content}
@@ -178,11 +189,12 @@ function PlanRow({ item }: { item: PlanItem }) {
       )}
       <button
         type="button"
-        onClick={() =>
+        onClick={() => {
+          setHidden(true);
           startTransition(async () => {
             await deletePlanItemAction(item.id);
-          })
-        }
+          });
+        }}
         className="shrink-0 text-xs text-ink-300 hover:text-red-600"
         aria-label="Delete"
       >
