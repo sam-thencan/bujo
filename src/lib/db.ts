@@ -19,7 +19,20 @@ async function runSchema(c: Client) {
     .split(";")
     .map((s) => s.trim())
     .filter(Boolean);
-  for (const stmt of statements) await c.execute(stmt);
+  // Per-statement tolerance: an index that references a column we're about
+  // to add via migrate() will fail on existing DBs; we catch and continue
+  // so migrate() still gets a chance to run.
+  for (const stmt of statements) {
+    try {
+      await c.execute(stmt);
+    } catch (e) {
+      console.warn(
+        "schema statement skipped:",
+        stmt.replace(/\s+/g, " ").slice(0, 80),
+        (e as Error).message,
+      );
+    }
+  }
 }
 
 // Idempotent ALTERs for tables that may pre-date a field. SQLite doesn't
@@ -56,6 +69,22 @@ async function migrate(c: Client) {
     "journal_id TEXT",
   );
   await backfillDefaultJournals(c);
+  // Indexes that reference journal_id — created here so they only run
+  // after the columns definitely exist.
+  for (const stmt of [
+    "CREATE INDEX IF NOT EXISTS idx_entries_journal_date ON entries(journal_id, log_date)",
+    "CREATE INDEX IF NOT EXISTS idx_entries_journal_month ON entries(journal_id, log_month)",
+    "CREATE INDEX IF NOT EXISTS idx_entries_journal_status ON entries(journal_id, status)",
+    "CREATE INDEX IF NOT EXISTS idx_day_summaries_journal ON day_summaries(journal_id, date)",
+    "CREATE INDEX IF NOT EXISTS idx_habits_journal_month ON habits(journal_id, month)",
+    "CREATE INDEX IF NOT EXISTS idx_plan_journal_month ON action_plan_items(journal_id, month)",
+  ]) {
+    try {
+      await c.execute(stmt);
+    } catch (e) {
+      console.warn("index creation skipped:", stmt, (e as Error).message);
+    }
+  }
 }
 
 // For every user without a current_journal_id, create a default journal
