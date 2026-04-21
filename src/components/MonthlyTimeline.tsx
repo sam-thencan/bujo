@@ -52,7 +52,7 @@ function TimelineRow({
   last: boolean;
 }) {
   const [draft, setDraft] = useState(summary);
-  const [saving, startSaving] = useTransition();
+  const [, startSaving] = useTransition();
   const dayNum = Number(date.slice(8, 10));
   const isToday = date === today();
   const letter = weekdayLetter(date);
@@ -105,11 +105,6 @@ function TimelineRow({
             />
           ))}
         </div>
-      )}
-      {saving && (
-        <span className="ml-1 text-[10px] text-ink-300" aria-live="polite">
-          …
-        </span>
       )}
     </li>
   );

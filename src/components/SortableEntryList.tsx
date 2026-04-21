@@ -72,7 +72,7 @@ export function SortableEntryList({
         items={items.map((i) => i.id)}
         strategy={verticalListSortingStrategy}
       >
-        <ul className="rounded-lg border border-ink-100 bg-white px-2">
+        <ul className="rounded-lg border border-ink-100 bg-white px-4">
           {items.map((entry) => (
             <SortableRow
               key={entry.id}
