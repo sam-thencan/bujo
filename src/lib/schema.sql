@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS entries (
   status TEXT NOT NULL DEFAULT 'open',
   priority INTEGER NOT NULL DEFAULT 0,
   priority_rank INTEGER,
+  indent INTEGER NOT NULL DEFAULT 0,
   log_date TEXT,
   log_month TEXT NOT NULL,
   order_index INTEGER NOT NULL DEFAULT 0,

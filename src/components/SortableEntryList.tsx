@@ -24,9 +24,11 @@ import { EntryItem } from "./EntryItem";
 export function SortableEntryList({
   entries,
   date,
+  ranks,
 }: {
   entries: Entry[];
   date: string;
+  ranks?: Map<string, number>;
 }) {
   const [items, setItems] = useState(entries);
   const [, startTransition] = useTransition();
@@ -72,7 +74,12 @@ export function SortableEntryList({
       >
         <ul className="rounded-lg border border-ink-100 bg-white px-2">
           {items.map((entry) => (
-            <SortableRow key={entry.id} entry={entry} date={date} />
+            <SortableRow
+              key={entry.id}
+              entry={entry}
+              date={date}
+              displayRank={ranks?.get(entry.id) ?? null}
+            />
           ))}
         </ul>
       </SortableContext>
@@ -80,7 +87,15 @@ export function SortableEntryList({
   );
 }
 
-function SortableRow({ entry, date }: { entry: Entry; date: string }) {
+function SortableRow({
+  entry,
+  date,
+  displayRank,
+}: {
+  entry: Entry;
+  date: string;
+  displayRank: number | null;
+}) {
   const {
     setNodeRef,
     transform,
@@ -97,6 +112,7 @@ function SortableRow({ entry, date }: { entry: Entry; date: string }) {
     <EntryItem
       entry={entry}
       context={{ kind: "day", date }}
+      displayRank={displayRank}
       sortable={{
         setNodeRef,
         style,

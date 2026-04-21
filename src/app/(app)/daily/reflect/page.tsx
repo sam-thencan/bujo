@@ -5,11 +5,11 @@ import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { DayHeader } from "@/components/DayHeader";
 import { DailySubNav } from "@/components/DailySubNav";
 import { BottomComposer } from "@/components/BottomComposer";
-import { SortableEntryList } from "@/components/SortableEntryList";
+import { ReflectionList } from "@/components/ReflectionList";
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
-export default async function DailyPage({
+export default async function DailyReflectPage({
   searchParams,
 }: {
   searchParams: { date?: string };
@@ -18,19 +18,7 @@ export default async function DailyPage({
   const raw = searchParams.date;
   const date = raw && dateRe.test(raw) ? raw : today();
   const entries = await listForDay(user.id, date);
-
-  const tasks = entries.filter((e) => e.type === "task");
-
-  // Position-based Top 3: the first three active tasks (open/scheduled)
-  // in the ordered list get the 1/2/3 badges. Completed/migrated/cancelled
-  // tasks don't consume rank slots.
-  const ranks = new Map<string, number>();
-  let n = 1;
-  for (const t of tasks) {
-    if ((t.status === "open" || t.status === "scheduled") && n <= 3) {
-      ranks.set(t.id, n++);
-    }
-  }
+  const reflections = entries.filter((e) => e.type !== "task");
 
   return (
     <div>
@@ -38,23 +26,25 @@ export default async function DailyPage({
       <DailySubNav date={date} />
 
       <section className="mt-3">
-        {tasks.length === 0 ? (
+        {reflections.length === 0 ? (
           <p className="rounded-lg border border-dashed border-ink-200 px-3 py-5 text-center text-xs text-ink-400">
-            No tasks yet — capture below. First three are your Top 3.
+            Nothing yet. Log events, notes, or moods from the composer.
+            <br />
+            Swipe right on a row to indent, left to un-indent.
           </p>
         ) : (
-          <SortableEntryList entries={tasks} date={date} ranks={ranks} />
+          <ReflectionList entries={reflections} date={date} />
         )}
       </section>
 
       <div className="h-24" aria-hidden />
 
-      <BottomComposer date={date} />
+      <BottomComposer date={date} defaultTypes={["event", "note", "mood"]} />
 
       <BoardSwitcher
         variant="day"
         current={date}
-        basePath="/daily"
+        basePath="/daily/reflect"
         paramKey="date"
       />
     </div>

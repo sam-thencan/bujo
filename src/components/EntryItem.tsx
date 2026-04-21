@@ -7,7 +7,6 @@ import {
   editEntryAction,
   migrateEntryAction,
   scheduleIntoMonthAction,
-  setPriorityRankAction,
   toggleDoneAction,
 } from "@/app/(app)/actions";
 import type { Entry, EntryStatus } from "@/lib/entries";
@@ -32,7 +31,8 @@ function symbolFor(e: Entry): string {
 export function EntryItem({
   entry,
   context,
-  hideRank,
+  displayRank,
+  indent,
   sortable,
 }: {
   entry: Entry;
@@ -40,7 +40,8 @@ export function EntryItem({
     | { kind: "day"; date: string }
     | { kind: "month"; month: string }
     | { kind: "future"; month: string };
-  hideRank?: boolean;
+  displayRank?: number | null;
+  indent?: number;
   sortable?: {
     setNodeRef?: (el: HTMLLIElement | null) => void;
     style?: React.CSSProperties;
@@ -57,17 +58,11 @@ export function EntryItem({
 
   // Optimistic state — applied instantly, reverted when server revalidates.
   const [pendingStatus, setPendingStatus] = useState<EntryStatus | null>(null);
-  const [pendingRank, setPendingRank] = useState<number | null | undefined>(
-    undefined,
-  );
   const [optimisticallyDeleted, setOptimisticallyDeleted] = useState(false);
 
   useEffect(() => {
     setPendingStatus(null);
   }, [entry.status]);
-  useEffect(() => {
-    setPendingRank(undefined);
-  }, [entry.priority_rank]);
 
   // Close on outside click or when another menu opens.
   useEffect(() => {
@@ -96,13 +91,12 @@ export function EntryItem({
   }
 
   const effectiveStatus = pendingStatus ?? entry.status;
-  const effectiveRank =
-    pendingRank === undefined ? entry.priority_rank : pendingRank;
   const isTask = entry.type === "task";
   const isDone = effectiveStatus === "done";
   const isCancelled = effectiveStatus === "cancelled";
   const isMigrated = effectiveStatus === "migrated";
-  const rank = effectiveRank;
+  const rank = displayRank ?? null;
+  const indentLevel = Math.max(0, Math.min(3, indent ?? 0));
 
   if (optimisticallyDeleted) return null;
 
@@ -138,8 +132,15 @@ export function EntryItem({
           : "")
       }
     >
+      {indentLevel > 0 && (
+        <span
+          className="shrink-0"
+          style={{ width: `${indentLevel * 16}px` }}
+          aria-hidden
+        />
+      )}
       <div className="flex shrink-0 items-start">
-        {!hideRank && rank ? (
+        {rank ? (
           <span
             className="mt-0.5 mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-ink-900 font-mono text-[11px] font-semibold text-white"
             aria-label={`Priority ${rank}`}
@@ -222,40 +223,6 @@ export function EntryItem({
         </button>
         {menuOpen && (
           <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border border-ink-200 bg-white text-sm shadow-soft">
-            {isTask && context.kind === "day" && (
-              <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2">
-                <span className="text-[11px] uppercase tracking-wide text-ink-400">
-                  Top 3
-                </span>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3].map((r) => {
-                    const active = rank === r;
-                    return (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          const next = active ? null : r;
-                          setPendingRank(next);
-                          run(() => setPriorityRankAction(entry.id, next));
-                        }}
-                        className={
-                          "inline-flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs transition " +
-                          (active
-                            ? "bg-ink-900 text-white"
-                            : "border border-ink-200 text-ink-700 hover:border-ink-400")
-                        }
-                        title={active ? `Clear top ${r}` : `Set as top ${r}`}
-                        aria-pressed={active}
-                      >
-                        {r}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
             <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2">
               <span className="text-[11px] uppercase tracking-wide text-ink-400">
                 Type

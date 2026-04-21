@@ -27,6 +27,7 @@ export type Entry = {
   status: EntryStatus;
   priority: number;
   priority_rank: number | null;
+  indent: number;
   log_date: string | null;
   log_month: string;
   order_index: number;
@@ -45,6 +46,7 @@ function rowToEntry(row: Record<string, unknown>): Entry {
     priority: Number(row.priority ?? 0),
     priority_rank:
       row.priority_rank == null ? null : Number(row.priority_rank),
+    indent: Number(row.indent ?? 0),
     log_date: row.log_date == null ? null : String(row.log_date),
     log_month: String(row.log_month),
     order_index: Number(row.order_index ?? 0),
@@ -60,11 +62,7 @@ export async function listForDay(userId: string, date: string): Promise<Entry[]>
   const res = await db.execute({
     sql: `SELECT * FROM entries
           WHERE user_id = ? AND log_date = ?
-          ORDER BY
-            (priority_rank IS NULL) ASC,
-            priority_rank ASC,
-            order_index ASC,
-            created_at ASC`,
+          ORDER BY order_index ASC, created_at ASC`,
     args: [userId, date],
   });
   return res.rows.map(rowToEntry);
@@ -249,6 +247,20 @@ export async function reorderEntries(
       args: [i + 1, id, userId],
     });
   }
+}
+
+export async function setEntryIndent(
+  userId: string,
+  id: string,
+  indent: number,
+): Promise<void> {
+  const clamped = Math.max(0, Math.min(3, Math.floor(indent)));
+  const db = await getDb();
+  await db.execute({
+    sql: `UPDATE entries SET indent = ?, updated_at = datetime('now')
+          WHERE id = ? AND user_id = ?`,
+    args: [clamped, id, userId],
+  });
 }
 
 export async function toggleDone(userId: string, id: string): Promise<Entry> {

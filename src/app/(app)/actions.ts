@@ -7,9 +7,9 @@ import {
   bulkMigrateOpen,
   createEntry,
   deleteEntry,
-  listForDay,
   migrateEntry,
   reorderEntries,
+  setEntryIndent,
   setPriorityRank,
   toggleDone,
   updateEntry,
@@ -56,7 +56,7 @@ export async function createEntryAction(input: {
   const log_date = input.log_date ?? null;
   const log_month =
     input.log_month ?? (log_date ? monthOf(log_date) : undefined);
-  const created = await createEntry(user.id, {
+  await createEntry(user.id, {
     type: parsed.type,
     content: parsed.content,
     priority: parsed.priority,
@@ -64,27 +64,17 @@ export async function createEntryAction(input: {
     log_month,
   });
 
-  // Auto-rank: first 3 open tasks for a day get Top 1/2/3 automatically.
-  if (created.type === "task" && log_date) {
-    const dayEntries = await listForDay(user.id, log_date);
-    const taken = new Set(
-      dayEntries
-        .filter(
-          (e) =>
-            e.type === "task" &&
-            e.priority_rank != null &&
-            e.status !== "migrated" &&
-            e.id !== created.id,
-        )
-        .map((e) => e.priority_rank),
-    );
-    const nextRank = [1, 2, 3].find((r) => !taken.has(r));
-    if (nextRank !== undefined) {
-      await setPriorityRank(user.id, created.id, nextRank);
-    }
-  }
-
   revalidateViews(log_date ? "daily" : log_month ? "future" : "daily");
+  return { ok: true };
+}
+
+export async function setEntryIndentAction(input: {
+  id: string;
+  indent: number;
+}) {
+  const user = await requireUser();
+  await setEntryIndent(user.id, input.id, input.indent);
+  revalidateViews("daily");
   return { ok: true };
 }
 
@@ -341,7 +331,10 @@ export async function deletePlanItemAction(id: string) {
 // ---------- Shared ----------
 
 function revalidateViews(scope: "daily" | "monthly" | "future" | "all" = "all") {
-  if (scope === "daily" || scope === "all") revalidatePath("/daily");
+  if (scope === "daily" || scope === "all") {
+    revalidatePath("/daily");
+    revalidatePath("/daily/reflect");
+  }
   if (scope === "monthly" || scope === "all") {
     revalidatePath("/monthly");
     revalidatePath("/monthly/plan");

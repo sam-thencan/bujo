@@ -36,6 +36,12 @@ async function ensureColumn(
 
 async function migrate(c: Client) {
   await ensureColumn(c, "entries", "priority_rank", "priority_rank INTEGER");
+  await ensureColumn(
+    c,
+    "entries",
+    "indent",
+    "indent INTEGER NOT NULL DEFAULT 0",
+  );
 }
 
 export async function getDb(): Promise<Client> {

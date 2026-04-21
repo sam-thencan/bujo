@@ -4,14 +4,24 @@ import { useState, useTransition } from "react";
 import { createEntryAction } from "@/app/(app)/actions";
 import type { EntryType } from "@/lib/entries";
 
-const TYPES: Array<{ key: EntryType; sym: string; label: string }> = [
+const ALL_TYPES: Array<{ key: EntryType; sym: string; label: string }> = [
   { key: "task", sym: "•", label: "Task" },
   { key: "event", sym: "○", label: "Event" },
   { key: "note", sym: "—", label: "Note" },
   { key: "mood", sym: "=", label: "Mood" },
 ];
 
-export function BottomComposer({ date }: { date: string }) {
+export function BottomComposer({
+  date,
+  defaultTypes,
+}: {
+  date: string;
+  defaultTypes?: EntryType[];
+}) {
+  const types = defaultTypes
+    ? ALL_TYPES.filter((t) => defaultTypes.includes(t.key))
+    : ALL_TYPES;
+  const primary = types[0]?.key ?? "task";
   const [raw, setRaw] = useState("");
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +57,13 @@ export function BottomComposer({ date }: { date: string }) {
             onKeyDown={(e) => {
               if (e.key === "Enter" && canSubmit) {
                 e.preventDefault();
-                submit("task");
+                submit(primary);
               }
             }}
             className="min-w-0 flex-1 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-base placeholder:text-ink-400 focus:border-ink-400 focus:bg-white focus:outline-none"
           />
           <div className="flex shrink-0 items-center gap-1">
-            {TYPES.map((t) => (
+            {types.map((t) => (
               <button
                 key={t.key}
                 type="button"
