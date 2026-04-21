@@ -1,11 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { listForDay } from "@/lib/entries";
-import { today } from "@/lib/dates";
-import { BoardSwitcher } from "@/components/BoardSwitcher";
+import { shiftDate, today } from "@/lib/dates";
+import { DaySlider } from "@/components/DaySlider";
 import { DayHeader } from "@/components/DayHeader";
 import { DailySubNav } from "@/components/DailySubNav";
 import { BottomComposer } from "@/components/BottomComposer";
 import { SortableEntryList } from "@/components/SortableEntryList";
+import { MigrateYesterdayBanner } from "@/components/MigrateYesterdayBanner";
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -18,6 +19,19 @@ export default async function DailyPage({
   const raw = searchParams.date;
   const date = raw && dateRe.test(raw) ? raw : today();
   const entries = await listForDay(user.id, date);
+
+  // Show the "migrate yesterday's open tasks" banner only when viewing today.
+  let yesterdayOpenCount = 0;
+  const isToday = date === today();
+  if (isToday) {
+    const yday = shiftDate(date, -1);
+    const ydayEntries = await listForDay(user.id, yday);
+    yesterdayOpenCount = ydayEntries.filter(
+      (e) =>
+        e.type === "task" &&
+        (e.status === "open" || e.status === "scheduled"),
+    ).length;
+  }
 
   const tasks = entries.filter((e) => e.type === "task");
 
@@ -37,6 +51,14 @@ export default async function DailyPage({
       <DayHeader date={date} />
       <DailySubNav date={date} />
 
+      {isToday && yesterdayOpenCount > 0 && (
+        <MigrateYesterdayBanner
+          fromDate={shiftDate(date, -1)}
+          toDate={date}
+          count={yesterdayOpenCount}
+        />
+      )}
+
       <section className="mt-3">
         {tasks.length === 0 ? (
           <p className="rounded-lg border border-dashed border-ink-200 px-3 py-5 text-center text-xs text-ink-400">
@@ -49,14 +71,9 @@ export default async function DailyPage({
 
       <div className="h-24" aria-hidden />
 
-      <BottomComposer date={date} />
+      <BottomComposer date={date} defaultTypes={["task", "event", "note"]} />
 
-      <BoardSwitcher
-        variant="day"
-        current={date}
-        basePath="/daily"
-        paramKey="date"
-      />
+      <DaySlider current={date} basePath="/daily" paramKey="date" />
     </div>
   );
 }

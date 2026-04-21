@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prettyDateLong, shiftDate, today } from "@/lib/dates";
 import { format, parseISO } from "date-fns";
+import { HamburgerMenu } from "./HamburgerMenu";
 
 export function DayHeader({ date }: { date: string }) {
   const isToday = date === today();
@@ -31,13 +32,7 @@ export function DayHeader({ date }: { date: string }) {
             → Today
           </Link>
         )}
-        <Link
-          href="/settings"
-          className="rounded-md px-2 py-1 text-sm text-ink-400 hover:text-ink-900"
-          aria-label="Settings"
-        >
-          ⚙
-        </Link>
+        <HamburgerMenu />
       </div>
     </header>
   );

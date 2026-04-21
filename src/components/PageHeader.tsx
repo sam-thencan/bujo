@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { HamburgerMenu } from "./HamburgerMenu";
 
 export function PageHeader({
   title,
@@ -21,13 +21,7 @@ export function PageHeader({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {action}
-        <Link
-          href="/settings"
-          className="rounded-md px-2 py-1 text-sm text-ink-400 hover:text-ink-900"
-          aria-label="Settings"
-        >
-          ⚙
-        </Link>
+        <HamburgerMenu />
       </div>
     </header>
   );
