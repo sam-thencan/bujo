@@ -54,7 +54,7 @@ export function BoardSwitcher({
   const todayHref = `${basePath}?${paramKey}=${variant === "day" ? today() : thisMonth()}`;
 
   return (
-    <div className="fixed inset-x-0 bottom-[52px] z-20 border-t border-ink-100 bg-ink-50/95 backdrop-blur">
+    <div className="fixed inset-x-0 bottom-[52px] z-20 border-t border-ink-100 bg-ink-50/95 pr-[var(--sb)] backdrop-blur">
       <div className="mx-auto flex max-w-screen-sm items-center gap-1 px-2 py-2.5">
         <Link
           href={`${basePath}?${paramKey}=${prev}`}

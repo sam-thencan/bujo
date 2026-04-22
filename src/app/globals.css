@@ -13,13 +13,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Reserve scrollbar space always so the scrolling main column and the
-   fixed bottom bars (composer, date slider, nav) center against the
-   same width. Without this, desktop browsers with visible scrollbars
-   push main left by half the scrollbar width while the fixed bars
-   stay full-viewport-centered — the classic misalignment. */
-html {
-  scrollbar-gutter: stable;
+/* A client script measures the scrollbar and sets --sb; fixed bars
+   pad their right edge by that amount so they align with the main
+   column (which is centered inside html's scrollbar-narrowed width).
+   Fallback 0 for pre-mount/no-script. */
+:root {
+  --sb: 0px;
 }
 
 /* Page background: slightly-darker off-white with a quiet dot grid so

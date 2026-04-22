@@ -43,7 +43,7 @@ export function BottomComposer({
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-[104px] z-30 border-t border-ink-100 bg-white/95 backdrop-blur">
+    <div className="fixed inset-x-0 bottom-[104px] z-30 border-t border-ink-100 bg-white/95 pr-[var(--sb)] backdrop-blur">
       <div className="mx-auto max-w-screen-sm px-3 py-2">
         <div className="flex items-center gap-2">
           <input

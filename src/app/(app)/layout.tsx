@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { TopLegend } from "@/components/TopLegend";
 import { BottomNav } from "@/components/BottomNav";
+import { ScrollbarVar } from "@/components/ScrollbarVar";
 
 export default async function AppLayout({
   children,
@@ -15,6 +16,7 @@ export default async function AppLayout({
   const settings = await getSettings(user.id);
   return (
     <div className="min-h-dvh">
+      <ScrollbarVar />
       <TopLegend show={settings.show_legend} />
       <main className="mx-auto max-w-screen-sm px-3 pb-[120px] pt-2">
         {children}

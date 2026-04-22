@@ -71,7 +71,7 @@ export function BottomNav() {
   const pathname = usePathname();
   return (
     <nav
-      className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-ink-50/95 backdrop-blur"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-ink-50/95 pr-[var(--sb)] backdrop-blur"
       aria-label="Primary"
     >
       <div className="mx-auto flex max-w-screen-sm">
