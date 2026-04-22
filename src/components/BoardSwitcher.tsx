@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   daysAround,
   monthsAround,
@@ -12,6 +12,11 @@ import {
   thisMonth,
 } from "@/lib/dates";
 import { format, parseISO } from "date-fns";
+
+// useLayoutEffect runs before paint (no visible "slide"), but it warns on
+// SSR — during the server render we fall back to useEffect.
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Variant = "day" | "month" | "future";
 
@@ -36,15 +41,18 @@ export function BoardSwitcher({
         : (months ?? []);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = containerRef.current?.querySelector<HTMLElement>(
-      "[data-active='true']",
-    );
-    if (el && containerRef.current) {
-      const c = containerRef.current;
-      const target = el.offsetLeft - c.clientWidth / 2 + el.clientWidth / 2;
-      c.scrollTo({ left: target, behavior: "instant" as ScrollBehavior });
-    }
+  useIsoLayoutEffect(() => {
+    const c = containerRef.current;
+    if (!c) return;
+    const el = c.querySelector<HTMLElement>("[data-active='true']");
+    if (!el) return;
+    // Position relative to the scroll container, not offsetParent. Centers
+    // the active pill within the visible viewport of the container.
+    const cRect = c.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    const target =
+      c.scrollLeft + (eRect.left - cRect.left) - c.clientWidth / 2 + el.clientWidth / 2;
+    c.scrollTo({ left: target, behavior: "instant" as ScrollBehavior });
   }, [current, variant]);
 
   const prev =
