@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
+import { getDb } from "@/lib/db";
+import { newId } from "@/lib/ids";
 import {
   createJournal,
   deleteJournal,
@@ -113,6 +115,54 @@ export async function revokeMemberAction(input: {
   } catch (e) {
     return { error: (e as Error).message };
   }
+  revalidateAll();
+  return { ok: true };
+}
+
+const requestSchema = z.object({
+  email: z.string().email(),
+  message: z.string().trim().max(500).optional(),
+});
+
+export async function requestAccessAction(input: {
+  email: string;
+  message?: string;
+}) {
+  const user = await requireUser();
+  const parsed = requestSchema.safeParse(input);
+  if (!parsed.success) return { error: "Enter a valid email." };
+  const target = parsed.data.email.toLowerCase();
+  if (target === user.email.toLowerCase()) {
+    return { error: "That's your own email." };
+  }
+  const db = await getDb();
+  const existing = await db.execute({
+    sql: `SELECT id FROM access_requests
+          WHERE requester_user_id = ? AND target_email = ? AND status = 'pending'
+          LIMIT 1`,
+    args: [user.id, target],
+  });
+  if (existing.rows[0]) {
+    return { error: "You already have a pending request to that email." };
+  }
+  await db.execute({
+    sql: `INSERT INTO access_requests
+          (id, requester_user_id, target_email, status, message)
+          VALUES (?, ?, ?, 'pending', ?)`,
+    args: [newId("ar"), user.id, target, parsed.data.message ?? null],
+  });
+  revalidateAll();
+  return { ok: true };
+}
+
+export async function cancelOutgoingRequestAction(requestId: string) {
+  const user = await requireUser();
+  const db = await getDb();
+  await db.execute({
+    sql: `DELETE FROM access_requests
+          WHERE id = ? AND requester_user_id = ? AND status = 'pending'`,
+    args: [requestId, user.id],
+  });
   revalidateAll();
   return { ok: true };
 }

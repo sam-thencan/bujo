@@ -3,20 +3,26 @@ import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { listJournals } from "@/lib/journals";
 import { listMembers, type Member } from "@/lib/memberships";
-import { listIncomingRequests } from "@/lib/accessRequests";
+import {
+  listIncomingRequests,
+  listOutgoingRequests,
+} from "@/lib/accessRequests";
 import { toggleLegendAction } from "@/app/(app)/actions";
 import { logoutAction } from "@/app/(auth)/actions";
 import { PageHeader } from "@/components/PageHeader";
 import { JournalsSettings } from "@/components/JournalsSettings";
 import { AccessRequestsInbox } from "@/components/AccessRequestsInbox";
+import { RequestAccessForm } from "@/components/RequestAccessForm";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [settings, journals, incomingRequests] = await Promise.all([
-    getSettings(user.id),
-    listJournals(user.id),
-    listIncomingRequests(user.email),
-  ]);
+  const [settings, journals, incomingRequests, outgoingRequests] =
+    await Promise.all([
+      getSettings(user.id),
+      listJournals(user.id),
+      listIncomingRequests(user.email),
+      listOutgoingRequests(user.id),
+    ]);
   const ownedJournals = journals.filter((j) => j.role === "owner");
   // Load members for each owned journal in parallel.
   const memberEntries: Array<[string, Member[]]> = await Promise.all(
@@ -54,6 +60,8 @@ export default async function SettingsPage() {
         currentId={user.current_journal_id}
         membersByJournal={membersByJournal}
       />
+
+      <RequestAccessForm outgoing={outgoingRequests} />
 
       <h2 className="mt-6 text-[11px] uppercase tracking-wide text-ink-400">
         Display
